@@ -11,6 +11,9 @@ import { prisma } from '@/lib/prisma';
 
 import { CampanaClient } from './campana-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function CampanaVacacionesPage() {
   const session = await getSession();
 

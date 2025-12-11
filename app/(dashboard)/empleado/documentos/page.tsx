@@ -7,6 +7,9 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function EmpleadoDocumentosPage() {
   const session = await getSession();
   

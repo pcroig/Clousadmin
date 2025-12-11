@@ -22,6 +22,9 @@ import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/servic
 import type { TipoNotificacion } from '@/lib/notificaciones';
 import type { NotificacionUI } from '@/types/Notificacion';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function ManagerDashboardPage() {
   const session = await getSession();
 

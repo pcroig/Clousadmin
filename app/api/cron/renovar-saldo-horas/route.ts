@@ -10,6 +10,9 @@ import { NextRequest } from 'next/server';
 import { initCronLogger } from '@/lib/cron/logger';
 import { renovarSaldoHorasAnual } from '@/lib/cron/renovar-saldo-horas';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

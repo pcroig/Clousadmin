@@ -58,6 +58,8 @@ export async function GET(
                 fechaNacimiento: true,
                 iban: true,
                 bic: true,
+                categoriaProfesional: true,
+                grupoCotizacion: true,
                 jornada: {
                   select: {
                     horasSemanales: true,
@@ -72,6 +74,7 @@ export async function GET(
                 fechaInicio: true,
                 fechaFin: true,
                 salarioBaseAnual: true,
+                tipoPagas: true,
               },
             },
             complementosAsignados: {
@@ -160,6 +163,9 @@ export async function GET(
         'Salario Base Anual': parseFloat(
           contrato?.salarioBaseAnual?.toString() || '0'
         ),
+        'Tipo Pagas': contrato?.tipoPagas || 12,
+        'Categoría Profesional': empleado.categoriaProfesional || '',
+        'Grupo Cotización': empleado.grupoCotizacion || '',
         'Horas/Semana': horasSemana ?? '',
 
         // Datos de la nómina

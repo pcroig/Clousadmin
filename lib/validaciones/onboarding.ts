@@ -9,7 +9,7 @@ import { validarIBAN } from './iban';
 import { normalizarIdentificacion } from './nif';
 
 /**
- * Validar NSS (Número de Seguridad Social) español
+ * Validar Número de Seguridad Social (NSS) español
  * Formato: 12 dígitos
  */
 function validarNSS(nss: string): boolean {
@@ -38,22 +38,22 @@ export const datosPersonalesSchema = z.object({
   // Identificación (obligatorios)
   nif: z
     .string()
-    .min(1, 'El NIF/NIE es obligatorio')
+    .min(1, 'El DNI/NIE es obligatorio')
     .transform((val) => normalizarIdentificacion(val))
     .superRefine((val, ctx) => {
       if (!validarIdentificacionEspanola(val)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Formato de NIF/NIE inválido (8 dígitos + letra, ej: 12345678Z o X1234567L)',
+          message: 'Formato de DNI/NIE inválido (8 dígitos + letra, ej: 12345678Z o X1234567L)',
         });
       }
     }),
   
   nss: z
     .string()
-    .min(1, 'El NSS es obligatorio')
+    .min(1, 'El Número de Seguridad Social es obligatorio')
     .refine((val) => validarNSS(val), {
-      message: 'NSS inválido (debe tener 12 dígitos)',
+      message: 'Número de Seguridad Social inválido (debe tener 12 dígitos)',
     }),
 
   // Contacto (obligatorio)
@@ -137,11 +137,11 @@ export const datosBancariosSchema = z.object({
 
   bic: z
     .string()
-    .min(8, 'El BIC debe tener al menos 8 caracteres')
-    .max(11, 'El BIC no puede tener más de 11 caracteres')
+    .min(8, 'El BIC/SWIFT debe tener al menos 8 caracteres')
+    .max(11, 'El BIC/SWIFT no puede tener más de 11 caracteres')
     .transform((val) => val.trim().replace(/\s+/g, '').toUpperCase())
     .refine((val) => /^[A-Z0-9]{8}([A-Z0-9]{3})?$/.test(val), {
-      message: 'Formato de BIC inválido. Ejemplo válido: BBVAESMMXXX',
+      message: 'Formato de BIC/SWIFT inválido. Ejemplo válido: BBVAESMMXXX',
     }),
 });
 

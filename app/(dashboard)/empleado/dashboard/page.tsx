@@ -16,6 +16,9 @@ import { EmpleadoDashboardClient } from './dashboard-client';
 import type { NotificacionUI } from '@/types/Notificacion';
 import type { ausencias } from '@prisma/client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 const ESTADOS_AUSENCIAS_ABIERTAS: EstadoAusencia[] = [
   EstadoAusencia.pendiente,

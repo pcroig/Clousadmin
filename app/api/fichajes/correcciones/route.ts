@@ -24,6 +24,7 @@ const crearCorreccionSchema = z.object({
   motivo: z.string().min(10, 'Explica brevemente el motivo de la corrección'),
   nuevaFecha: z.string().optional(),
   nuevaHora: z.string().optional(),
+  detalles: z.any().optional(), // Detalles extensos para auditoría (ediciones optimistas)
 });
 
 export async function POST(req: NextRequest) {
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     const validation = await validateRequest(req, crearCorreccionSchema);
     if (isNextResponse(validation)) return validation;
 
-    const { fichajeId, motivo, nuevaFecha, nuevaHora } = validation.data;
+    const { fichajeId, motivo, nuevaFecha, nuevaHora, detalles } = validation.data;
 
     if (!nuevaFecha && !nuevaHora) {
       return badRequestResponse('Debes indicar la nueva fecha, la nueva hora o ambas.');
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
         empleadoId: session.user.empleadoId,
         fichajeId,
         motivo,
-        detalles: {
+        detalles: detalles ?? {
           nuevaFecha: nuevaFecha ?? null,
           nuevaHora: nuevaHora ?? null,
         },

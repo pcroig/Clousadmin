@@ -7,6 +7,9 @@ import { prisma } from '@/lib/prisma';
 
 import { MiEspacioHRClient } from './mi-espacio-hr-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function MiEspacioHRPage() {
   const session = await getSession();

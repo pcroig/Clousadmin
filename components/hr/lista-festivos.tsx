@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,6 +70,10 @@ export function ListaFestivos({
   const [formNombre, setFormNombre] = useState('');
   const [formActivo, setFormActivo] = useState(true);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const parseDateValue = (value?: string) => (value ? new Date(`${value}T00:00:00`) : undefined);
+  const handleFormFechaSelect = (date: Date | undefined) => {
+    setFormFecha(date ? format(date, 'yyyy-MM-dd') : '');
+  };
 
   const esCreando = useMemo(
     () => editorState?.mode === 'crear',
@@ -352,11 +357,11 @@ export function ListaFestivos({
                     <Label htmlFor="fechaFestivo" className="sr-only">
                       Fecha
                     </Label>
-                    <Input
-                      id="fechaFestivo"
-                      type="date"
-                      value={formFecha}
-                      onChange={(event) => setFormFecha(event.target.value)}
+                    <ResponsiveDatePicker
+                      date={parseDateValue(formFecha)}
+                      onSelect={handleFormFechaSelect}
+                      placeholder="Seleccionar fecha"
+                      label="Seleccionar fecha de festivo"
                     />
                   </TableCell>
                   <TableCell>

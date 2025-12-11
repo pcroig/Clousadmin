@@ -361,7 +361,7 @@ export function NominaDetailsClient({ nomina, ausencias }: NominaDetailsClientPr
             </div>
 
             <div>
-              <div className="text-sm text-gray-600 mb-1">Número Seguridad Social</div>
+              <div className="text-sm text-gray-600 mb-1">Número de Seguridad Social</div>
               <div className="font-medium text-gray-900">
                 {nomina.empleado.nss || (
                   <span className="text-orange-600 flex items-center gap-1">

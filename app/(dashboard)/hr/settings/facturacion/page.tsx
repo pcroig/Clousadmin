@@ -16,6 +16,9 @@ import { BILLING_ENABLED, getActiveProducts, getSubscriptionStatus } from '@/lib
 import { BillingClient } from './billing-client';
 import { BillingLoading } from './billing-loading';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function BillingSettingsPage() {
   const session = await getSession();
 

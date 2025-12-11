@@ -343,7 +343,7 @@ export function FichajesTab({
               label: 'Trabajadas',
             },
             {
-              value: `${resumen.balanceAcumulado >= 0 ? '+' : ''}${Math.floor(resumen.balanceAcumulado)}h ${Math.abs(Math.round((resumen.balanceAcumulado % 1) * 60))}m`,
+              value: `${resumen.balanceAcumulado >= 0 ? '+' : ''}${formatearHorasMinutos(resumen.balanceAcumulado)}`,
               label: 'Saldo',
               color: resumen.balanceAcumulado >= 0 ? 'green' : 'red',
             },

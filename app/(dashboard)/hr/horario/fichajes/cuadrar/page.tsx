@@ -5,6 +5,9 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { CuadrarFichajesClient } from './cuadrar-fichajes-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function CuadrarFichajesPage() {
   const session = await getSession();
 

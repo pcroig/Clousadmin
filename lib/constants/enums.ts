@@ -71,6 +71,7 @@ export const ESTADO_FICHAJE_LABELS: Record<EstadoFichaje, string> = {
   en_curso: 'En Curso',
   pendiente: 'Pendiente Revisión',
   finalizado: 'Finalizado',
+  rechazado: 'Rechazado',
 };
 
 export const TIPO_FICHAJE_EVENTO_LABELS: Record<TipoFichajeEvento, string> = {
@@ -173,5 +174,6 @@ export const ESTADOS_FICHAJE_OPTIONS = [
   { value: EstadoFichaje.en_curso, label: ESTADO_FICHAJE_LABELS.en_curso },
   { value: EstadoFichaje.pendiente, label: ESTADO_FICHAJE_LABELS.pendiente },
   { value: EstadoFichaje.finalizado, label: ESTADO_FICHAJE_LABELS.finalizado },
+  { value: EstadoFichaje.rechazado, label: ESTADO_FICHAJE_LABELS.rechazado },
 ];
 

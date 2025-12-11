@@ -761,19 +761,29 @@ export async function obtenerHorasEsperadasBatch(
 
   const uniqueEmpleadoIds = Array.from(new Set(entradas.map((entrada) => entrada.empleadoId)));
 
-  const empleados =
-    (await prisma.empleados.findMany({
+  // Cargar empleados con sus equipos (no jornada directa)
+  const empleados = await prisma.empleados.findMany({
     where: {
       id: {
         in: uniqueEmpleadoIds,
       },
     },
-    include: {
-      jornada: true,
+    select: {
+      id: true,
+      jornadaId: true,
+      equipos: {
+        select: {
+          equipoId: true,
+        },
+      },
     },
-    })) ?? [];
+  });
 
-  const empleadoMap = new Map(empleados.map((empleado) => [empleado.id, empleado]));
+  // Resolver jornadas efectivas en batch
+  const { resolverJornadasBatch } = await import('@/lib/jornadas/resolver-batch');
+  const jornadasResueltas = await resolverJornadasBatch(empleados);
+
+  // Construir resultado
   const resultado: Record<string, number> = {};
 
   for (const entrada of entradas) {
@@ -785,16 +795,15 @@ export async function obtenerHorasEsperadasBatch(
       continue;
     }
 
-    const empleado = empleadoMap.get(entrada.empleadoId);
+    const jornada = jornadasResueltas.get(entrada.empleadoId);
 
-    const horasEsperadas =
-      empleado && empleado.jornada
-        ? calcularHorasEsperadasDesdeConfig(
-            empleado.jornada.config as JornadaConfig,
-            fechaBase,
-            Number(empleado.jornada.horasSemanales)
-          )
-        : 0;
+    const horasEsperadas = jornada
+      ? calcularHorasEsperadasDesdeConfig(
+          jornada.config as JornadaConfig,
+          fechaBase,
+          Number(jornada.horasSemanales)
+        )
+      : 0;
 
     resultado[key] = horasEsperadas;
   }
@@ -855,17 +864,44 @@ export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boo
     select: {
       id: true,
       empresaId: true,
-      jornada: {
-        select: {
-          id: true,
-          activa: true,
-          config: true,
-        },
+      jornadaId: true,
+      equipos: {
+        select: { equipoId: true },
       },
     },
   });
 
-  if (!empleado || !empleado.jornada || !empleado.jornada.activa) {
+  if (!empleado) {
+    return false;
+  }
+
+  // Resolver jornada efectiva (individual > equipo > empresa)
+  const equipoIds = empleado.equipos
+    .map(eq => eq.equipoId)
+    .filter((id): id is string => Boolean(id));
+
+  const { obtenerJornadaEmpleado } = await import('@/lib/jornadas/helpers');
+  const jornadaInfo = await obtenerJornadaEmpleado({
+    empleadoId: empleado.id,
+    equipoIds,
+    jornadaIdDirecta: empleado.jornadaId,
+  });
+
+  if (!jornadaInfo || !jornadaInfo.jornadaId) {
+    return false;
+  }
+
+  // Obtener datos completos de la jornada
+  const jornada = await prisma.jornadas.findUnique({
+    where: { id: jornadaInfo.jornadaId },
+    select: {
+      id: true,
+      activa: true,
+      config: true,
+    },
+  });
+
+  if (!jornada || !jornada.activa) {
     return false;
   }
 
@@ -891,8 +927,16 @@ export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boo
 
   const festivosSet = crearSetFestivos(festivos);
   const ausenciasSet = ausencia ? new Set<string>([empleado.id]) : undefined;
+
+  // Construir objeto con estructura esperada por evaluarDisponibilidadEmpleado
+  const empleadoConJornada = {
+    id: empleado.id,
+    empresaId: empleado.empresaId,
+    jornada,
+  };
+
   const evaluacion = evaluarDisponibilidadEmpleado(
-    empleado,
+    empleadoConJornada,
     fechaSinHora,
     diasLaborables,
     festivosSet,
@@ -928,14 +972,21 @@ async function calcularEmpleadosDisponibles(
   empresaId: string,
   fecha: Date
 ): Promise<EmpleadoDisponible[]> {
+  // FIX CRÍTICO: Calcular el día siguiente a medianoche para comparar fechas sin considerar hora
+  // Si fecha = 2025-12-10 00:00, queremos incluir empleados con fechaAlta hasta 2025-12-10 23:59:59
+  // Por tanto usamos < 2025-12-11 00:00 (equivalente a <= 2025-12-10 fin del día)
+  const fechaFinDia = new Date(fecha);
+  fechaFinDia.setDate(fechaFinDia.getDate() + 1); // Día siguiente a medianoche
+
   const [empleados, diasLaborables, festivos, ausenciasDiaCompleto] = await Promise.all([
     prisma.empleados.findMany({
       where: {
         empresaId,
         activo: true,
-        // FIX: Solo empleados que ya estaban dados de alta en la fecha objetivo
+        // FIX: Solo empleados dados de alta ANTES de la fecha objetivo (comparación por DÍA, no timestamp)
+        // Incluye empleados con fechaAlta en cualquier momento del día objetivo
         fechaAlta: {
-          lte: fecha,
+          lt: fechaFinDia,
         },
       },
       select: {
@@ -944,11 +995,10 @@ async function calcularEmpleadosDisponibles(
         nombre: true,
         apellidos: true,
         fotoUrl: true,
-        jornada: {
+        jornadaId: true,
+        equipos: {
           select: {
-            id: true,
-            activa: true,
-            config: true,
+            equipoId: true,
           },
         },
       },
@@ -980,6 +1030,10 @@ async function calcularEmpleadosDisponibles(
     return [];
   }
 
+  // Resolver jornadas efectivas para todos los empleados (optimizado en batch)
+  const { resolverJornadasBatch } = await import('@/lib/jornadas/resolver-batch');
+  const jornadasResueltas = await resolverJornadasBatch(empleados);
+
   const ausenciasSet = new Set(ausenciasDiaCompleto.map((ausencia) => ausencia.empleadoId));
   const stats = {
     sinJornada: 0,
@@ -990,8 +1044,16 @@ async function calcularEmpleadosDisponibles(
   };
 
   const filtrados = empleados.filter((empleado) => {
+    // Construir empleado con jornada resuelta para evaluarDisponibilidadEmpleado
+    const jornadaResuelta = jornadasResueltas.get(empleado.id);
+    const empleadoConJornada = {
+      id: empleado.id,
+      empresaId: empleado.empresaId,
+      jornada: jornadaResuelta || null,
+    };
+
     const evaluacion = evaluarDisponibilidadEmpleado(
-      empleado,
+      empleadoConJornada,
       fecha,
       diasLaborables,
       festivosSet,
@@ -1031,7 +1093,20 @@ async function calcularEmpleadosDisponibles(
     );
   }
 
-  return filtrados;
+  // Construir objetos EmpleadoDisponible con jornada resuelta
+  const empleadosDisponibles: EmpleadoDisponible[] = filtrados.map(emp => {
+    const jornadaResuelta = jornadasResueltas.get(emp.id);
+    return {
+      id: emp.id,
+      empresaId: emp.empresaId,
+      nombre: emp.nombre,
+      apellidos: emp.apellidos,
+      fotoUrl: emp.fotoUrl,
+      jornada: jornadaResuelta || null,
+    };
+  });
+
+  return empleadosDisponibles;
 }
 
 /**
@@ -1342,12 +1417,19 @@ export async function validarFichajeCompleto(
     }
 
     // Eventos básicos requeridos
-    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'tarde') {
+    // CORRECCIÓN: Lógica consistente con cuadrar/route.ts
+    // - Ausencia mañana: NO requiere entrada (viene después del horario de mañana)
+    // - Ausencia tarde: NO requiere salida (se va antes del horario de tarde)
+    if (!ausenciaMedioDia.tieneAusencia) {
+      // Día completo trabajado: requiere entrada y salida
       eventosRequeridos.push('entrada');
-    }
-    
-    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'manana') {
       eventosRequeridos.push('salida');
+    } else if (ausenciaMedioDia.medioDia === 'manana') {
+      // Ausencia mañana: solo requiere salida (trabaja solo la tarde)
+      eventosRequeridos.push('salida');
+    } else if (ausenciaMedioDia.medioDia === 'tarde') {
+      // Ausencia tarde: solo requiere entrada (trabaja solo la mañana)
+      eventosRequeridos.push('entrada');
     }
 
     // Pausa es opcional según configuración
@@ -1368,13 +1450,18 @@ export async function validarFichajeCompleto(
       };
     }
 
-    // Siempre entrada y salida
-    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'tarde') {
+    // Siempre entrada y salida (excepto si hay ausencia medio día)
+    // CORRECCIÓN: Lógica consistente con cuadrar/route.ts
+    if (!ausenciaMedioDia.tieneAusencia) {
+      // Día completo trabajado: requiere entrada y salida
       eventosRequeridos.push('entrada');
-    }
-    
-    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'manana') {
       eventosRequeridos.push('salida');
+    } else if (ausenciaMedioDia.medioDia === 'manana') {
+      // Ausencia mañana: solo requiere salida (trabaja solo la tarde)
+      eventosRequeridos.push('salida');
+    } else if (ausenciaMedioDia.medioDia === 'tarde') {
+      // Ausencia tarde: solo requiere entrada (trabaja solo la mañana)
+      eventosRequeridos.push('entrada');
     }
 
     // Pausa obligatoria solo si hay descansoMinimo configurado
@@ -1515,114 +1602,3 @@ export async function validarDescansoAntesDeSalida(
   };
 }
 
-/**
- * Verifica si un fichaje debe cerrarse automáticamente según el límite superior de la jornada
- * o porque pertenece a un día anterior.
- *
- * @param fichaje - Fichaje a evaluar con jornada incluida
- * @param ahora - Fecha/hora actual (opcional, por defecto new Date())
- * @returns true si el fichaje debe cerrarse automáticamente
- */
-export function debeCerrarseAutomaticamente(
-  fichaje: {
-    fecha: Date;
-    estado: string;
-    empleado?: {
-      jornada?: {
-        config: unknown;
-      } | null;
-    };
-  },
-  ahora: Date = new Date()
-): boolean {
-  // Solo cerrar fichajes en estado 'en_curso'
-  if (fichaje.estado !== PrismaEstadoFichaje.en_curso) {
-    return false;
-  }
-
-  const fechaFichaje = normalizarFechaSinHora(fichaje.fecha);
-  const fechaHoy = normalizarFechaSinHora(ahora);
-
-  // Si el fichaje es de un día anterior a hoy, debe cerrarse
-  if (fechaFichaje < fechaHoy) {
-    return true;
-  }
-
-  // Si el fichaje es de hoy, verificar el límite superior
-  if (fechaFichaje.getTime() === fechaHoy.getTime()) {
-    const jornada = fichaje.empleado?.jornada;
-    if (!jornada) {
-      // Sin jornada, no podemos determinar límite superior
-      // Mantener abierto (conservador)
-      return false;
-    }
-
-    const config = jornada.config as JornadaConfig | null;
-    if (!config) {
-      return false;
-    }
-
-    const limiteSuperior = config.limiteSuperior;
-    if (!limiteSuperior || typeof limiteSuperior !== 'string') {
-      // Sin límite superior configurado, solo cerrar si es día anterior
-      return false;
-    }
-
-    // Parsear límite superior (formato "HH:mm")
-    const [horaLimite, minutoLimite] = limiteSuperior.split(':').map(Number);
-    if (horaLimite === undefined || minutoLimite === undefined) {
-      return false;
-    }
-
-    // Crear fecha límite (mismo día que el fichaje, con la hora límite superior)
-    const fechaLimite = new Date(fechaFichaje);
-    fechaLimite.setHours(horaLimite, minutoLimite, 0, 0);
-
-    // Si ya pasó el límite superior, debe cerrarse
-    return ahora > fechaLimite;
-  }
-
-  // Fichaje es del futuro (no debería ocurrir), no cerrar
-  return false;
-}
-
-/**
- * Cierra automáticamente un fichaje que quedó abierto, clasificándolo como pendiente o finalizado
- * según su completitud.
- *
- * @param fichajeId - ID del fichaje a cerrar
- * @param prismaClient - Cliente de Prisma (opcional, para uso en transacciones)
- * @returns Estado final del fichaje ('finalizado' o 'pendiente')
- */
-export async function cerrarFichajeAutomaticamente(
-  fichajeId: string,
-  prismaClient?: PrismaClient | Prisma.TransactionClient
-): Promise<'finalizado' | 'pendiente'> {
-  const client = prismaClient ?? prisma;
-
-  // Obtener fichaje con validación completa
-  const validacion = await validarFichajeCompleto(fichajeId);
-
-  // Actualizar cálculos antes de cerrar
-  await actualizarCalculosFichaje(fichajeId, client);
-
-  const estadoFinal = validacion.completo
-    ? PrismaEstadoFichaje.finalizado
-    : PrismaEstadoFichaje.pendiente;
-
-  await client.fichajes.update({
-    where: { id: fichajeId },
-    data: {
-      estado: estadoFinal,
-      // Si está finalizado, marcar fecha de aprobación automática
-      ...(validacion.completo && { fechaAprobacion: new Date() }),
-    },
-  });
-
-  console.log(
-    `[cerrarFichajeAutomaticamente] Fichaje ${fichajeId} cerrado automáticamente: ${estadoFinal}`,
-    { completo: validacion.completo, razon: validacion.razon }
-  );
-
-  return estadoFinal === PrismaEstadoFichaje.finalizado ? 'finalizado' : 'pendiente';
-}

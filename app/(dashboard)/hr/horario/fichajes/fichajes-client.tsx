@@ -88,12 +88,14 @@ const ESTADO_OPTIONS: FilterOption[] = [
   { value: 'en_curso', label: 'En curso' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'finalizado', label: 'Finalizado' },
+  { value: 'rechazado', label: 'Rechazado' },
 ];
 
 const FICHAJE_ESTADO_VARIANTS: Record<string, { label: string; className: string }> = {
   en_curso: { label: 'En curso', className: 'bg-blue-100 text-blue-800' },
   pendiente: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
   finalizado: { label: 'Finalizado', className: 'bg-gray-100 text-gray-800' },
+  rechazado: { label: 'Rechazado', className: 'bg-red-100 text-red-800' },
 };
 
 const getFichajeEstadoLabel = (estado: string): string =>
@@ -201,16 +203,20 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
 
     fichajes.forEach(f => {
       // Normalizar fecha a string YYYY-MM-DD para usar como key
+      // IMPORTANTE: Agrupar por empleado + fecha para evitar mezclar fichajes de diferentes empleados del mismo día
       const fechaReferencia = obtenerFechaReferencia(f);
-      const fechaKey = format(fechaReferencia, 'yyyy-MM-dd');
-      
+      const fechaKey = `${f.empleado.id}_${format(fechaReferencia, 'yyyy-MM-dd')}`;
+
       if (!grupos[fechaKey]) {
         grupos[fechaKey] = [];
       }
       grupos[fechaKey].push(f);
     });
 
-    return Object.entries(grupos).map(([fecha, fichajesDelDia]) => {
+    return Object.entries(grupos).map(([key, fichajesDelDia]) => {
+      // Extraer la fecha del key (formato: empleadoId_yyyy-MM-dd)
+      const fechaStr = key.split('_').slice(1).join('_'); // Toma todo después del primer _
+
       const eventosOrdenados = (
         fichajesDelDia.flatMap((registro) => registro.eventos) as FichajeEvento[]
       ).sort(
@@ -219,14 +225,30 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
 
       let horasTrabajadas = 0;
       const fichaje = fichajesDelDia[0];
-      if (fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined) {
-        const valor = fichaje.horasTrabajadas;
-        horasTrabajadas = typeof valor === 'string' ? parseFloat(valor) : valor;
-        if (Number.isNaN(horasTrabajadas)) {
-          horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados) ?? 0;
+
+      // FIX CRÍTICO: SIEMPRE calcular con progreso en curso para fichajes no finalizados
+      // La lógica correcta es: si está en_curso, IGNORAR horasTrabajadas del backend y calcular en cliente
+      const esFichajeEnCurso = fichaje.estado === EstadoFichaje.en_curso;
+
+      if (esFichajeEnCurso) {
+        // Fichaje en curso: SIEMPRE calcular con tiempo hasta ahora
+        const { horasAcumuladas, horaEnCurso } = calcularProgresoEventos(eventosOrdenados);
+        horasTrabajadas = horasAcumuladas;
+
+        if (horaEnCurso) {
+          const ahora = new Date();
+          const horasDesdeUltimoEvento = (ahora.getTime() - horaEnCurso.getTime()) / (1000 * 60 * 60);
+          horasTrabajadas += horasDesdeUltimoEvento;
         }
       } else {
-        horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados) ?? 0;
+        // Fichaje finalizado: usar valor del backend si existe
+        if (fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined) {
+          const valor = fichaje.horasTrabajadas;
+          horasTrabajadas = typeof valor === 'string' ? parseFloat(valor) : valor;
+          if (Number.isNaN(horasTrabajadas)) {
+            horasTrabajadas = 0;
+          }
+        }
       }
 
       const entrada = eventosOrdenados.find(e => e.tipo === 'entrada');
@@ -246,6 +268,13 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       })();
 
       const balance = (() => {
+        // FIX CRÍTICO: Si el fichaje está en_curso, SIEMPRE recalcular balance con horasTrabajadas actualizado
+        // NO usar balance del backend porque está basado en horasTrabajadas desactualizado
+        if (esFichajeEnCurso) {
+          return Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
+        }
+
+        // Fichaje finalizado: puede usar balance del backend
         const valor = (fichaje as { balance?: number | string | null }).balance;
         if (valor === null || valor === undefined) {
           return Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
@@ -257,8 +286,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       })();
 
       // Convertir fecha string a Date usando toMadridDate para evitar desfases de zona horaria
-      const fechaDate = toMadridDate(fecha);
-      
+      const fechaDate = toMadridDate(fechaStr);
+
       return {
         empleadoId: fichaje.empleado.id,
         empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,

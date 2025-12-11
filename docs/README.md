@@ -59,14 +59,16 @@ docs/
 │   ├── 2025-10-consolidado.md
 │   └── 2025-11-05-fix-email-duplicado.md
 │
-├── funcionalidades/                  # Documentación de cada funcionalidad
+├── funcionalidades/                  # 📘 Lógica de negocio, workflows y validaciones
 │   ├── analytics.md
 │   ├── ausencias.md
 │   ├── autenticacion.md
 │   ├── bandeja-entrada.md
 │   ├── canal-denuncias.md            # ✨ Sistema de denuncias internas
-│   ├── complementos-salariales.md    # ⭐ NUEVO: Sistema de complementos (fijos y variables)
+│   ├── complementos-salariales.md    # ⭐ Sistema de complementos (fijos y variables)
 │   ├── documentos.md
+│   ├── empleados.md                  # ⭐ Gestión completa de empleados
+│   ├── equipos.md                    # ⭐ Gestión de equipos y managers
 │   ├── festivos.md
 │   ├── fichajes.md
 │   ├── gestion-nominas.md
@@ -91,6 +93,33 @@ docs/
     ├── README.md
     └── sugerencias-futuras.md
 ```
+
+## 📖 Organización de la Documentación
+
+### Separación API vs Funcionalidad
+
+La documentación está organizada en dos categorías complementarias:
+
+**`/docs/api/reference/`** - Referencia Técnica de API
+- Contratos de endpoints (requests, responses)
+- Parámetros y validaciones técnicas
+- Códigos de error y respuestas HTTP
+- Ejemplos de curl/JSON
+- **Audiencia**: Desarrolladores externos, integraciones, contratos API
+
+**`/docs/funcionalidades/`** - Lógica de Negocio
+- Workflows completos (alta, baja, aprobaciones)
+- Validaciones de negocio
+- Permisos por rol
+- Casos de uso y ejemplos prácticos
+- Integraciones entre módulos
+- **Audiencia**: Desarrolladores internos, product managers
+
+**Ejemplo:**
+- [`api/reference/empleados.md`](api/reference/empleados.md) → Lista de endpoints, parámetros, responses
+- [`funcionalidades/empleados.md`](funcionalidades/empleados.md) → Ciclo de vida del empleado, onboarding, offboarding, permisos
+
+---
 
 ## 📖 Guías rápidas
 
@@ -171,5 +200,33 @@ Ver [docs/historial/README.md](historial/README.md) para el índice completo.
 - ✅ Agregadas referencias entre documentos de optimización
 - ✅ Agregadas referencias entre documentos de testing
 
-**Versión**: 1.5  
-**Última actualización**: 27 de enero 2025
+### Cambios Recientes (11 de diciembre 2025)
+
+#### Fix Crítico: Balance de Fichajes y Formateo de Horas Negativas
+- ✅ **Bug corregido**: `formatearHorasMinutos()` mostraba balances negativos incorrectos
+- ✅ **Causa raíz**: `Math.floor(-7.48) = -8` en lugar de `-7` (uso correcto: `Math.trunc()`)
+- ✅ **Impacto**: Toda la plataforma (HR, Empleados, Widgets, Exportaciones)
+- ✅ **Archivos modificados**:
+  - `lib/utils/formatters.ts` → Fix centralizado con `Math.trunc()`
+  - `components/shared/mi-espacio/fichajes-tab.tsx` → Eliminar código duplicado
+  - `app/(dashboard)/hr/horario/fichajes/fichajes-client.tsx` → Limpieza de DEBUG logs
+- ✅ **Documentación**: [`historial/2025-12-11-fix-balance-fichajes-formateo.md`](historial/2025-12-11-fix-balance-fichajes-formateo.md)
+- ✅ **Resultado**: Balance correcto en todas las vistas (ej: `-7.48h` → `-7h 29m` ✅ en lugar de `-8h 31m` ❌)
+
+### Cambios Anteriores (10 de diciembre 2025)
+
+#### Reorganización de Documentación API
+- ✅ **Opción A implementada**: Separación clara entre API reference y funcionalidades
+- ✅ Refactorizado `api/reference/empleados.md` a resumen de endpoints (de 786 a 150 líneas)
+- ✅ Refactorizado `api/reference/equipos.md` a resumen de endpoints (de 603 a 188 líneas)
+- ✅ Creado `funcionalidades/empleados.md` con lógica de negocio completa
+- ✅ Creado `funcionalidades/equipos.md` con workflows y validaciones
+- ✅ Actualizado `api/README.md` con tabla de referencias cruzadas
+- ✅ Mejoradas referencias cruzadas entre documentos
+
+#### Estructura Actual
+- **`/docs/api/reference/`** → Contratos técnicos de API (requests, responses, parámetros)
+- **`/docs/funcionalidades/`** → Lógica de negocio, workflows, validaciones, casos de uso
+
+**Versión**: 1.7
+**Última actualización**: 11 de diciembre 2025

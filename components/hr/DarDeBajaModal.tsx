@@ -1,11 +1,13 @@
 'use client';
 
+import { format } from 'date-fns';
 import { FileText, Upload, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { CarpetaSelector } from '@/components/shared/carpeta-selector';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -55,6 +57,8 @@ export function DarDeBajaModal({
   const [motivo, setMotivo] = useState('');
   const [documentos, setDocumentos] = useState<DocumentoSubir[]>([]);
   const [loading, setLoading] = useState(false);
+  const parseDateValue = (value?: string) => (value ? new Date(`${value}T00:00:00`) : undefined);
+  const handleFechaFinSelect = (date: Date | undefined) => setFechaFin(date ? format(date, 'yyyy-MM-dd') : '');
   const [carpetaIdSeleccionada, setCarpetaIdSeleccionada] = useState<string | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'lectura' | 'firma') => {
@@ -207,13 +211,14 @@ export function DarDeBajaModal({
             <Label htmlFor="fechaFin" className="required">
               Fecha de Finalización *
             </Label>
-            <Input
-              id="fechaFin"
-              type="date"
-              value={fechaFin}
-              onChange={(e) => setFechaFin(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
+            <ResponsiveDatePicker
+              date={parseDateValue(fechaFin)}
+              onSelect={handleFechaFinSelect}
+              placeholder="Seleccionar fecha"
+              label="Seleccionar fecha de finalización"
+              fromDate={new Date()}
               disabled={loading}
+              className="w-full"
             />
             <p className="text-xs text-gray-500 mt-1">
               Fecha en la que el contrato será finalizado

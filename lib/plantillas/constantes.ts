@@ -183,7 +183,7 @@ export const VARIABLES_DISPONIBLES: VariableDefinicion[] = [
   },
   {
     key: 'empleado_bic',
-    label: 'Código BIC',
+    label: 'BIC/SWIFT',
     tipo: 'string',
     ejemplo: 'BBVAESMMXXX',
     categoria: 'empleado',

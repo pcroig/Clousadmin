@@ -295,7 +295,7 @@ export const VARIABLES_DISPONIBLES: VariableDefinicion[] = [
   },
   {
     key: 'empleado_nif',
-    label: 'NIF/NIE',
+    label: 'DNI/NIE',
     tipo: 'string',
     ejemplo: '12345678A',
     categoria: 'empleado',
@@ -303,7 +303,7 @@ export const VARIABLES_DISPONIBLES: VariableDefinicion[] = [
   },
   {
     key: 'empleado_nss',
-    label: 'Número Seguridad Social',
+    label: 'Número de Seguridad Social',
     tipo: 'string',
     ejemplo: '123456789012',
     categoria: 'empleado',
@@ -402,7 +402,7 @@ export const VARIABLES_DISPONIBLES: VariableDefinicion[] = [
   },
   {
     key: 'empleado_bic',
-    label: 'Código BIC',
+    label: 'BIC/SWIFT',
     tipo: 'string',
     ejemplo: 'BBVAESMMXXX',
     categoria: 'empleado',

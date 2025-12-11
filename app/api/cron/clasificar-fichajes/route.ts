@@ -25,7 +25,11 @@ import { EstadoFichaje } from '@/lib/constants/enums';
 import { initCronLogger } from '@/lib/cron/logger';
 import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
+import { chunk, enqueueJob } from '@/lib/queue';
 import { normalizarFechaSinHora } from '@/lib/utils/fechas';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function POST(request: NextRequest) {
   let cronLogger: ReturnType<typeof initCronLogger> | null = null;

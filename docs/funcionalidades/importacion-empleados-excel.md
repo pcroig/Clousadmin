@@ -74,16 +74,20 @@ Sistema de importación masiva de empleados desde archivos Excel con procesamien
 
 ### Onboarding (Sign Up de Empresa)
 
-**Ruta:** `/signup` → Paso 1 "Importar Empleados"
+**Ruta:** `/signup` → Paso 1 "Añadir Empleados" → Opción "Desde Excel"
 
-**Componente:** `components/onboarding/importar-empleados.tsx`
+**Componente:** `components/onboarding/add-empleados-onboarding.tsx`
 
-**Uso:** Durante el proceso de onboarding inicial de la empresa para importar empleados masivamente.
+**Uso:** Durante el proceso de onboarding inicial de la empresa. El paso 1 ofrece 3 opciones:
+1. **Añadir Manual** (recomendado) - Formulario completo
+2. **Desde Documento** - Extracción con IA de PDF/imagen
+3. **Desde Excel** - Importación masiva (este componente)
 
 **Comportamiento especial en onboarding:**
 - Los empleados se crean sin jornada asignada (se asignará cuando se complete el paso 3 "Jornada Laboral")
 - UI integrada en el flujo multi-paso del signup
 - El onboarding completo consta de 7 pasos (0-6) todos en la misma ruta `/signup`
+- Props especiales: `showCancelButton={false}` y `showFinishButton={false}`
 
 ### HR/Organización
 
@@ -91,7 +95,9 @@ Sistema de importación masiva de empleados desde archivos Excel con procesamien
 
 **Componente:** `components/organizacion/add-persona-document-form.tsx`
 
-**Uso:** Para importar empleados adicionales después del onboarding inicial.
+**Uso:** Para importar empleados adicionales después del onboarding inicial. Muestra una pantalla de selección con 2 opciones:
+1. **Documento Individual** - Subir contrato o DNI
+2. **Excel Masivo** - Importación masiva (este componente)
 
 ---
 
@@ -241,8 +247,8 @@ El sistema usa **OpenAI GPT-4** (con fallback a Anthropic Claude y Google Gemini
 El sistema puede detectar automáticamente:
 - ✅ Nombre y apellidos
 - ✅ Email
-- ✅ NIF/NIE/DNI
-- ✅ NSS (Número Seguridad Social)
+- ✅ DNI/NIE
+- ✅ NSS (Número de Seguridad Social)
 - ✅ IBAN
 - ✅ Teléfono
 - ✅ Fecha de nacimiento
@@ -258,7 +264,7 @@ El sistema puede detectar automáticamente:
 
 Cada empleado detectado se valida automáticamente:
 - ✅ Email válido y único
-- ✅ NIF válido (formato español)
+- ✅ DNI/NIE válido (formato español)
 - ✅ Campos requeridos presentes (nombre, apellidos, email)
 - ✅ Fechas válidas
 - ✅ Salarios numéricos válidos
@@ -360,7 +366,8 @@ Los datos sensibles se encriptan antes de guardar:
 - Resumen de éxito (empleados creados, equipos, puestos, invitaciones)
 - Lista de errores si los hubo
 - Lista de empleados importados (expandible)
-- Botones: "Importar más empleados" y "Guardar y volver" (si aplica)
+- Botón: "Importar más empleados"
+- Botón: "Guardar y volver" (solo si `showFinishButton={true}`)
 
 ---
 
@@ -642,5 +649,29 @@ Si un campo no se detecta:
 
 ---
 
-**Última actualización:** 2025-11-26  
-**Versión:** 2.3.0
+**Última actualización:** 2025-12-10
+**Versión:** 2.4.0
+
+---
+
+## 📝 Changelog
+
+### v2.4.0 (10 Dic 2025)
+
+**Mejoras en UI y UX:**
+- ✅ **Botón redundante eliminado**: Ya no aparece el botón "Cancelar" junto a "Guardar y volver"
+- ✅ **Estructura simplificada de botones**: Solo "Importar más empleados" y "Guardar y volver" (condicional)
+- ✅ **Integración mejorada en onboarding**: Ahora es una de las 3 opciones del nuevo componente `AddEmpleadosOnboarding`
+- ✅ **Props configurables**: `showCancelButton` y `showFinishButton` para controlar botones visibles
+
+**Integración con onboarding:**
+- El componente se usa dentro de `AddEmpleadosOnboarding` en modo onboarding
+- Se integra junto con "Añadir Manual" y "Desde Documento"
+- UI coherente con navegación "← Volver a opciones"
+
+### v2.3.0 (26 Nov 2025)
+
+**Logs y diagnóstico:**
+- Logs de depuración añadidos en 3 niveles (parser, IA input, IA output)
+- Selección inteligente de hoja con scoring
+- Documentación de proceso de troubleshooting

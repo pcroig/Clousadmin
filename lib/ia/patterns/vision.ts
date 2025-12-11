@@ -93,7 +93,7 @@ export interface DocumentAnalysisResult<T = unknown> {
  *   schema,
  *   {
  *     nombre: 'Nombre completo',
- *     nif: 'NIF/DNI/NIE',
+ *     nif: 'DNI/NIE',
  *     fechaNacimiento: 'Fecha de nacimiento',
  *   }
  * );

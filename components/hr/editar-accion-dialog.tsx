@@ -118,28 +118,28 @@ export function EditarAccionDialog({ accion, onSave, onCancel }: EditarAccionDia
           {/* Configuración específica según tipo */}
           {accionEditada.tipo === 'rellenar_campos' && (
             <ConfigRellenarCampos
-              config={accionEditada.config}
+              config={accionEditada.config as import('@/lib/onboarding-config-types').RellenarCamposConfig}
               onChange={(config) => setAccionEditada({ ...accionEditada, config })}
             />
           )}
 
           {accionEditada.tipo === 'compartir_docs' && (
             <ConfigCompartirDocs
-              config={accionEditada.config}
+              config={accionEditada.config as import('@/lib/onboarding-config-types').CompartirDocsConfig}
               onChange={(config) => setAccionEditada({ ...accionEditada, config })}
             />
           )}
 
           {accionEditada.tipo === 'solicitar_docs' && (
             <ConfigSolicitarDocs
-              config={accionEditada.config}
+              config={accionEditada.config as import('@/lib/onboarding-config-types').SolicitarDocsConfig}
               onChange={(config) => setAccionEditada({ ...accionEditada, config })}
             />
           )}
 
           {accionEditada.tipo === 'solicitar_firma' && (
             <ConfigSolicitarFirma
-              config={accionEditada.config}
+              config={accionEditada.config as import('@/lib/onboarding-config-types').SolicitarFirmaConfig}
               onChange={(config) => setAccionEditada({ ...accionEditada, config })}
             />
           )}

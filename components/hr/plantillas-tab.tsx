@@ -82,7 +82,7 @@ const VARIABLE_TO_CAMPO: Record<
   { grupo: keyof CamposRequeridos; campo: string; label: string }
 > = {
   empleado_nif: { grupo: 'datos_personales', campo: 'nif', label: 'NIF/NIE' },
-  empleado_nss: { grupo: 'datos_personales', campo: 'nss', label: 'Nº Seguridad Social' },
+  empleado_nss: { grupo: 'datos_personales', campo: 'nss', label: 'Número de Seguridad Social' },
   empleado_telefono: { grupo: 'datos_personales', campo: 'telefono', label: 'Teléfono' },
   empleado_direccion_calle: {
     grupo: 'datos_personales',
@@ -124,7 +124,7 @@ const VARIABLE_TO_CAMPO: Record<
   empleado_bic: {
     grupo: 'datos_bancarios',
     campo: 'bic',
-    label: 'Código BIC',
+    label: 'BIC/SWIFT',
   },
 };
 

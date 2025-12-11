@@ -33,7 +33,6 @@ export function NuevaPersonaPreDialog({
         // Evita que el auto-focus caiga en el primer botón y muestre el ring inicial
         onOpenAutoFocus={(event) => {
           event.preventDefault();
-          event.currentTarget.focus();
         }}
       >
         <DialogHeader>

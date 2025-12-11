@@ -6,6 +6,9 @@ import { OTPForm } from '@/components/auth/otp-form';
 import { getSession, validateTwoFactorChallenge } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 const TWO_FACTOR_COOKIE = 'clousadmin-2fa';
 
 export default async function VerifyOtpPage() {

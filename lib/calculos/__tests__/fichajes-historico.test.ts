@@ -316,7 +316,7 @@ describe('fichajes-historico', () => {
       );
 
       expect(resultado.salida).not.toEqual(eventos.salida);
-      expect(resultado.salida!.getTime()).toBeLessThan(eventos.salida.getTime());
+      expect(resultado.salida!.getTime()).toBeLessThan(eventos.salida!.getTime());
     });
 
     it('debe retornar sin cambios si no hay entrada o salida', () => {

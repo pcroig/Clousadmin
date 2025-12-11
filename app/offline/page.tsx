@@ -2,6 +2,9 @@ export const metadata = {
   title: "Clousadmin - Sin conexión",
 };
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default function OfflinePage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#FAF9F5] px-6 text-center text-gray-800">

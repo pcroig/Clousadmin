@@ -9,6 +9,9 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { JornadasClient } from './jornadas-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function JornadasPage() {
   const session = await getSession();

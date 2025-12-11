@@ -10,6 +10,7 @@ import { AlertCircle, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { TableHeader as PageHeader } from '@/components/shared/table-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ import {
 import { EstadoFichaje } from '@/lib/constants/enums';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { extraerHoraDeISO, formatearHorasMinutos } from '@/lib/utils/formatters';
+import { calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
 
 
 interface FichajeEvento {
@@ -91,6 +93,10 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
   const [motivoCorreccion, setMotivoCorreccion] = useState('');
   const [nuevaFecha, setNuevaFecha] = useState('');
   const [nuevaHora, setNuevaHora] = useState('');
+  const parseDateValue = (value?: string) => (value ? new Date(`${value}T00:00:00`) : undefined);
+  const handleNuevaFechaSelect = (date: Date | undefined) => {
+    setNuevaFecha(date ? format(date, 'yyyy-MM-dd') : '');
+  };
 
   const calcularHorasTrabajadas = useCallback((eventos: FichajeEvento[]): number => {
     let horasTotales = 0;
@@ -136,7 +142,29 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
         new Date(a.hora).getTime() - new Date(b.hora).getTime()
       );
 
-      const horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados) ?? 0;
+      // FIX CRÍTICO: SIEMPRE calcular con progreso en curso para fichajes no finalizados
+      const esFichajeEnCurso = fichaje.estado === EstadoFichaje.en_curso;
+      let horasTrabajadas = 0;
+
+      if (esFichajeEnCurso) {
+        // Fichaje en curso: calcular con tiempo hasta ahora
+        const { horasAcumuladas, horaEnCurso } = calcularProgresoEventos(eventosOrdenados);
+        horasTrabajadas = horasAcumuladas;
+        if (horaEnCurso) {
+          const ahora = new Date();
+          const horasDesdeUltimoEvento = (ahora.getTime() - horaEnCurso.getTime()) / (1000 * 60 * 60);
+          horasTrabajadas += horasDesdeUltimoEvento;
+        }
+      } else {
+        // Fichaje finalizado: usar valor del backend si existe, sino calcular cerrado
+        if (fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined) {
+          horasTrabajadas = Number(fichaje.horasTrabajadas);
+        } else {
+          // Calcular solo horas cerradas (sin tiempo en curso)
+          const { horasAcumuladas } = calcularProgresoEventos(eventosOrdenados);
+          horasTrabajadas = horasAcumuladas;
+        }
+      }
 
       const entrada = eventosOrdenados.find(e => e.tipo === 'entrada');
       const salida = eventosOrdenados.find(e => e.tipo === 'salida');
@@ -433,11 +461,12 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="nueva-fecha">Nueva Fecha</Label>
-                  <Input
-                    id="nueva-fecha"
-                    type="date"
-                    value={nuevaFecha}
-                    onChange={(e) => setNuevaFecha(e.target.value)}
+                  <ResponsiveDatePicker
+                    date={parseDateValue(nuevaFecha)}
+                    onSelect={handleNuevaFechaSelect}
+                    placeholder="Seleccionar fecha"
+                    label="Seleccionar fecha de corrección"
+                    className="w-full"
                   />
                 </div>
                 <div>

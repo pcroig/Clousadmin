@@ -2,14 +2,14 @@
 // HR Analytics/Informes Page - Optimized with Dynamic Import
 // ========================================
 
-import dynamic from 'next/dynamic';
+import dynamicImport from 'next/dynamic';
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 // Lazy load analytics (recharts es pesado - ~140KB)
-const AnalyticsClient = dynamic(() => import('./analytics-client').then((mod) => ({ default: mod.AnalyticsClient })), {
+const AnalyticsClient = dynamicImport(() => import('./analytics-client').then((mod) => ({ default: mod.AnalyticsClient })), {
   loading: () => (
     <div className="flex h-full items-center justify-center">
       <div className="flex flex-col items-center gap-3">
@@ -19,6 +19,9 @@ const AnalyticsClient = dynamic(() => import('./analytics-client').then((mod) =>
     </div>
   ),
 });
+
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
 
 export default async function InformesPage() {
   const session = await getSession();

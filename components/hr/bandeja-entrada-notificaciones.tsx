@@ -53,7 +53,7 @@ export function BandejaEntradaNotificaciones({
         // Disparar evento para sincronizar tablas de fichajes
         window.dispatchEvent(new CustomEvent('fichaje-updated'));
       } else {
-        const error = await response.json();
+        const error = await response.json() as { message?: string };
         toast.error(error.message || 'Error al rechazar la edición');
       }
     } catch (error) {

@@ -10,6 +10,7 @@ import {
   requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
+import { obtenerJornadaEmpleado } from '@/lib/jornadas/helpers';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(req: NextRequest) {
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    // Obtener todos los empleados activos
+    // Obtener todos los empleados activos con sus equipos
     const empleados = await prisma.empleados.findMany({
       where: {
         empresaId: session.user.empresaId,
@@ -30,21 +31,44 @@ export async function GET(req: NextRequest) {
         nombre: true,
         apellidos: true,
         jornadaId: true,
+        equipos: {
+          select: {
+            equipoId: true,
+          },
+        },
       },
     });
 
-    // Filtrar empleados sin jornada asignada
-    const empleadosSinJornada = empleados.filter(emp => !emp.jornadaId);
+    // Verificar jornada efectiva para cada empleado (considerando jerarquía: individual > equipo > empresa)
+    const empleadosSinJornada = [];
+
+    for (const emp of empleados) {
+      // Extraer IDs de equipos
+      const equipoIds = emp.equipos
+        .map((eq) => eq.equipoId)
+        .filter((id): id is string => Boolean(id));
+
+      // Resolver jornada efectiva
+      const jornadaInfo = await obtenerJornadaEmpleado({
+        empleadoId: emp.id,
+        equipoIds,
+        jornadaIdDirecta: emp.jornadaId,
+      });
+
+      if (!jornadaInfo || !jornadaInfo.jornadaId) {
+        empleadosSinJornada.push({
+          id: emp.id,
+          nombre: emp.nombre,
+          apellidos: emp.apellidos,
+        });
+      }
+    }
 
     return successResponse({
       completo: empleadosSinJornada.length === 0,
       totalEmpleados: empleados.length,
       empleadosConJornada: empleados.length - empleadosSinJornada.length,
-      empleadosSinJornada: empleadosSinJornada.map(emp => ({
-        id: emp.id,
-        nombre: emp.nombre,
-        apellidos: emp.apellidos,
-      })),
+      empleadosSinJornada,
     });
   } catch (error) {
     return handleApiError(error, 'API GET /api/empleados/validar-jornadas-completas');

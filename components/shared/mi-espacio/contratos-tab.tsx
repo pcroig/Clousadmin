@@ -6,30 +6,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { DarDeBajaModal } from '@/components/hr/DarDeBajaModal';
+import { JornadaDisplay } from '@/components/shared/jornada-display';
 import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 import { SearchableSelect } from '@/components/shared/searchable-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
+import { JornadasModal } from '@/app/(dashboard)/hr/horario/fichajes/jornadas-modal';
+import type { JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 import { TIPO_CONTRATO_LABELS, TipoContrato } from '@/lib/constants/enums';
-import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import { parseJson } from '@/lib/utils/json';
 
 
 import type { MiEspacioEmpleado } from '@/types/empleado';
-
-type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
-
-interface JornadaOption {
-  id: string;
-  nombre?: string;
-  etiqueta?: string | null;
-  horasSemanales?: number | null;
-  config?: JornadaConfig | null;
-  tipo?: 'fija' | 'flexible';
-}
 
 interface PuestoOption {
   id: string;
@@ -67,20 +57,8 @@ interface ContratosTabProps {
   rol?: 'empleado' | 'manager' | 'hr_admin';
 }
 
-const DIA_KEYS: DiaKey[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-const DIA_INICIAL: Record<DiaKey, string> = {
-  lunes: 'L',
-  martes: 'M',
-  miercoles: 'X',
-  jueves: 'J',
-  viernes: 'V',
-  sabado: 'S',
-  domingo: 'D',
-};
-
 export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) {
   const router = useRouter();
-  const [jornadas, setJornadas] = useState<JornadaOption[]>([]);
   const [puestos, setPuestos] = useState<PuestoOption[]>([]);
   const [darDeBajaModalOpen, setDarDeBajaModalOpen] = useState(false);
   const [editingHistorial, setEditingHistorial] = useState(false);
@@ -105,7 +83,6 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
   const [grupoCotizacion, setGrupoCotizacion] = useState(
     empleado.grupoCotizacion ? String(empleado.grupoCotizacion) : ''
   );
-  const [jornadaSeleccionada, setJornadaSeleccionada] = useState(empleado.jornadaId ?? '');
   const [puestoSeleccionado, setPuestoSeleccionado] = useState(empleado.puestoId ?? '');
   const initialEquiposDisponibles = useMemo(
     () =>
@@ -127,53 +104,26 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
   );
   const [managerOptions, setManagerOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [managerSeleccionado, setManagerSeleccionado] = useState(empleado.manager?.id ?? '');
+  const [sedesDisponibles, setSedesDisponibles] = useState<Array<{ value: string; label: string }>>([]);
+  const [sedeSeleccionada, setSedeSeleccionada] = useState(empleado.sede?.id ?? '');
   const [updatingField, setUpdatingField] = useState<string | null>(null);
   const isHrAdmin = rol === 'hr_admin';
   const isManager = rol === 'manager';
   const canManageJornadas = isHrAdmin || isManager;
-  const [crearJornadaModalOpen, setCrearJornadaModalOpen] = useState(false);
+  const [jornadasModalOpen, setJornadasModalOpen] = useState(false);
 
-  const normalizeJornadas = useCallback(
-    (payload: unknown): JornadaOption[] => {
-      const parsed = payload as { jornadas?: unknown[] };
-      const rawList = Array.isArray(payload)
-        ? payload
-        : Array.isArray(parsed?.jornadas)
-          ? parsed.jornadas
-          : [];
-
-      return rawList.flatMap((item) => {
-        const jornada = item as Record<string, unknown>;
-        const id = typeof jornada.id === 'string' ? jornada.id : '';
-        if (!id) return [];
-
-        const config = (jornada.config as JornadaConfig | null) ?? null;
-        const horasSemanales =
-          typeof jornada.horasSemanales === 'number' ? jornada.horasSemanales : null;
-        const etiqueta = typeof jornada.etiqueta === 'string' ? jornada.etiqueta : null;
-        const tipo =
-          jornada.tipo === 'fija' || jornada.tipo === 'flexible' ? jornada.tipo : undefined;
-
-        const etiquetaCalculada = obtenerEtiquetaJornada({
-          horasSemanales: horasSemanales ?? 0,
-          config,
-          id,
-        });
-
-        return [
-          {
-            id,
-            nombre: etiqueta ?? etiquetaCalculada,
-            etiqueta: etiqueta ?? etiquetaCalculada,
-            horasSemanales,
-            config,
-            tipo,
-          },
-        ];
-      });
-    },
-    []
-  );
+  // Estado para la jornada efectiva (resuelve individual > equipo > empresa)
+  const [jornadaEfectivaInfo, setJornadaEfectivaInfo] = useState<{
+    jornadaId: string | null;
+    origen: 'individual' | 'equipo' | 'empresa' | null;
+    equipoNombre?: string;
+    jornada: {
+      id: string;
+      horasSemanales: number;
+      config: JornadaConfig | null;
+    } | null;
+  } | null>(null);
+  const [loadingJornadaEfectiva, setLoadingJornadaEfectiva] = useState(false);
 
   const tipoContratoOptions = useMemo(
     () =>
@@ -200,10 +150,19 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     { value: 'educacion_universitaria_postgrado', label: 'Universitaria / Postgrado' },
   ] as const;
 
-  const grupoCotizacionOptions = Array.from({ length: 11 }, (_value, index) => ({
-    value: String(index + 1),
-    label: `Grupo ${index + 1}`,
-  }));
+  const grupoCotizacionOptions = [
+    { value: '1', label: 'Grupo 1: Ingenieros y Licenciados, alta dirección' },
+    { value: '2', label: 'Grupo 2: Ingenieros Técnicos, Peritos y Ayudantes titulados' },
+    { value: '3', label: 'Grupo 3: Jefes Administrativos y de Taller' },
+    { value: '4', label: 'Grupo 4: Ayudantes no titulados' },
+    { value: '5', label: 'Grupo 5: Oficiales Administrativos' },
+    { value: '6', label: 'Grupo 6: Subalternos' },
+    { value: '7', label: 'Grupo 7: Auxiliares Administrativos' },
+    { value: '8', label: 'Grupo 8: Oficiales de primera y segunda' },
+    { value: '9', label: 'Grupo 9: Oficiales de tercera y Especialistas' },
+    { value: '10', label: 'Grupo 10: Peones' },
+    { value: '11', label: 'Grupo 11: Trabajadores menores de 18 años (cualquier categoría)' },
+  ];
 
   // Helper functions para obtener labels
   const getCategoriaLabel = (value: string | null | undefined): string => {
@@ -243,6 +202,10 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     setManagerSeleccionado(empleado.manager?.id ?? '');
   }, [empleado.manager?.id]);
 
+  useEffect(() => {
+    setSedeSeleccionada(empleado.sede?.id ?? '');
+  }, [empleado.sede?.id]);
+
   // Cargar complementos del empleado
   const fetchComplementosEmpleado = useCallback(async () => {
     try {
@@ -257,6 +220,37 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     }
   }, [empleado.id]);
 
+  // Cargar jornada efectiva del empleado
+  const fetchJornadaEfectiva = useCallback(async () => {
+    setLoadingJornadaEfectiva(true);
+    try {
+      const response = await fetch(`/api/empleados/${empleado.id}/jornada-efectiva`);
+      if (!response.ok) {
+        throw new Error('Error al cargar jornada efectiva');
+      }
+      const data = await parseJson<{
+        jornadaId: string | null;
+        origen: 'individual' | 'equipo' | 'empresa' | null;
+        equipoNombre?: string;
+        jornada: {
+          id: string;
+          horasSemanales: number;
+          config: JornadaConfig | null;
+        } | null;
+      }>(response);
+      setJornadaEfectivaInfo(data);
+    } catch (error) {
+      console.error('[ContratosTab] Error fetching jornada efectiva:', error);
+    } finally {
+      setLoadingJornadaEfectiva(false);
+    }
+  }, [empleado.id]);
+
+  useEffect(() => {
+    // Cargar jornada efectiva para todos los roles
+    void fetchJornadaEfectiva();
+  }, [fetchJornadaEfectiva]);
+
   useEffect(() => {
     if (!isHrAdmin) {
       return;
@@ -266,23 +260,15 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
 
     const fetchAdminData = async () => {
       try {
-        const [jornadasResponse, puestosResponse, equiposResponse, managersResponse, tiposComplementoResponse] = await Promise.allSettled([
-          fetch('/api/jornadas'),
+        const [puestosResponse, equiposResponse, managersResponse, sedesResponse, tiposComplementoResponse] = await Promise.allSettled([
           fetch('/api/organizacion/puestos'),
           fetch('/api/organizacion/equipos'),
           fetch('/api/empleados?activos=true&limit=200'),
+          fetch('/api/organizacion/sedes'),
           fetch('/api/tipos-complemento'),
         ]);
 
         if (!isMounted) return;
-
-        if (jornadasResponse.status === 'fulfilled' && jornadasResponse.value.ok) {
-          const payload = await parseJson<JornadaOption[] | { jornadas?: JornadaOption[] }>(
-            jornadasResponse.value
-          ).catch(() => null);
-          const lista = normalizeJornadas(payload);
-          setJornadas(lista);
-        }
 
         if (puestosResponse.status === 'fulfilled' && puestosResponse.value.ok) {
           const payload = await parseJson<PuestoOption[] | { puestos?: PuestoOption[] }>(
@@ -327,6 +313,23 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
           );
         }
 
+        if (sedesResponse.status === 'fulfilled' && sedesResponse.value.ok) {
+          const payload = await parseJson<
+            Array<{ id: string; nombre: string; ciudad: string }> | { sedes?: Array<{ id: string; nombre: string; ciudad: string }> }
+          >(sedesResponse.value).catch(() => null);
+          const lista = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.sedes)
+            ? payload?.sedes
+            : [];
+          setSedesDisponibles(
+            lista.map((sede) => ({
+              value: sede.id,
+              label: `${sede.nombre} (${sede.ciudad})`,
+            }))
+          );
+        }
+
         if (tiposComplementoResponse.status === 'fulfilled' && tiposComplementoResponse.value.ok) {
           const payload = await parseJson<TipoComplemento[] | { tipos?: TipoComplemento[] }>(
             tiposComplementoResponse.value
@@ -354,31 +357,6 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     };
   }, [isHrAdmin, empleado.id, fetchComplementosEmpleado]);
 
-  useEffect(() => {
-    if (!isManager) return;
-
-    let isMounted = true;
-
-    const fetchManagerJornadas = async () => {
-      try {
-        const response = await fetch('/api/jornadas');
-        if (!response.ok || !isMounted) return;
-        const payload = await parseJson<JornadaOption[] | { jornadas?: JornadaOption[] }>(response).catch(
-          () => null
-        );
-        if (!isMounted) return;
-        setJornadas(normalizeJornadas(payload));
-      } catch (error) {
-        console.error('[ContratosTab] Error fetching jornadas (manager):', error);
-      }
-    };
-
-    void fetchManagerJornadas();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isManager, normalizeJornadas]);
 
   // Escuchar evento de "Dar de Baja" desde el header
   useEffect(() => {
@@ -391,16 +369,6 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     window.addEventListener('darDeBajaContrato', handleDarDeBajaEvent);
     return () => window.removeEventListener('darDeBajaContrato', handleDarDeBajaEvent);
   }, [rol]);
-
-  const jornadaActual =
-    jornadas.find((j) => j.id === empleado.jornadaId) ??
-    (empleado.jornada
-      ? {
-          id: empleado.jornada.id,
-          nombre: empleado.jornada.etiqueta,
-          horasSemanales: empleado.jornada.horasSemanales,
-        }
-      : undefined);
 
   const puestoActual =
     puestos.find((p) => p.id === empleado.puestoId) ??
@@ -422,6 +390,10 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
   const managerEmpleado = empleado.manager
     ? `${empleado.manager.nombre}${empleado.manager.apellidos ? ` ${empleado.manager.apellidos}` : ''}`.trim()
     : 'Sin manager';
+
+  const sedeEmpleado = empleado.sede
+    ? `${empleado.sede.nombre} (${empleado.sede.ciudad})`
+    : 'Sin sede';
 
   const updateEmpleadoField = async (
     payload: Record<string, unknown>,
@@ -501,19 +473,6 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     }
   };
 
-  const handleJornadaChange = async (value: string) => {
-    const previous = jornadaSeleccionada;
-    const nextValue = value || '';
-    setJornadaSeleccionada(nextValue);
-    const success = await updateEmpleadoField(
-      nextValue ? { jornadaId: nextValue } : { jornadaId: null },
-      nextValue ? 'Jornada actualizada' : 'Jornada eliminada'
-    );
-    if (!success) {
-      setJornadaSeleccionada(previous);
-    }
-  };
-
   const handlePuestoChange = async (value: string) => {
     const previous = puestoSeleccionado;
     const nextValue = value || '';
@@ -551,6 +510,21 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
       );
       if (!success) {
         setManagerSeleccionado(previous);
+      }
+    })();
+  };
+
+  const handleSedeChange = (value: string) => {
+    const previous = sedeSeleccionada;
+    const nextValue = value || '';
+    setSedeSeleccionada(nextValue);
+    void (async () => {
+      const success = await updateEmpleadoField(
+        nextValue ? { sedeId: nextValue } : { sedeId: null },
+        nextValue ? 'Sede actualizada' : 'Sede eliminada'
+      );
+      if (!success) {
+        setSedeSeleccionada(previous);
       }
     })();
   };
@@ -686,15 +660,9 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Información básica</h3>
 
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Empleado</label>
-              <div className="text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                {empleado.nombre} {empleado.apellidos} ({empleado.email})
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de inicio</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de alta</label>
               <Input
                 type="text"
                 value={new Date(empleado.fechaAlta).toLocaleDateString('es-ES')}
@@ -720,13 +688,13 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
                 <Input type="text" value={tipoContratoLabel} readOnly className="bg-gray-50" />
               )}
             </div>
-            {tipoContrato === 'temporal' && fechaFin && (
+            {tipoContrato && !['indefinido', 'fijo_discontinuo', 'administrador'].includes(tipoContrato) && (
               <div>
                 <Label htmlFor="fechaFin">Fecha de fin</Label>
                 <Input
                   id="fechaFin"
                   type="text"
-                  value={new Date(fechaFin).toLocaleDateString('es-ES')}
+                  value={fechaFin ? new Date(fechaFin).toLocaleDateString('es-ES') : 'Sin fecha de fin'}
                   readOnly
                   className="bg-gray-50"
                 />
@@ -810,6 +778,30 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
                 <Input
                   type="text"
                   value={managerEmpleado}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sede</label>
+              {isHrAdmin ? (
+                sedesDisponibles.length === 0 ? (
+                  <Input type="text" value={sedeEmpleado} readOnly className="bg-gray-50" />
+                ) : (
+                  <SearchableSelect
+                    items={sedesDisponibles}
+                    value={sedeSeleccionada}
+                    onChange={handleSedeChange}
+                    placeholder="Seleccionar sede"
+                    label="Seleccionar sede"
+                    disabled={updatingField === 'sedeId'}
+                  />
+                )
+              ) : (
+                <Input
+                  type="text"
+                  value={sedeEmpleado}
                   readOnly
                   className="bg-gray-50"
                 />
@@ -961,12 +953,11 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
                           </label>
                           {tiposComplemento.length > 0 ? (
                             <SearchableSelect
-                              items={tiposComplemento.map((tipo) => ({
-                                value: tipo.id,
-                            label: tipo.nombre,
-                              }))}
-                              // Opción para crear uno nuevo
-                              extras={[
+                              items={[
+                                ...tiposComplemento.map((tipo) => ({
+                                  value: tipo.id,
+                                  label: tipo.nombre,
+                                })),
                                 {
                                   value: '__new',
                                   label: '+ Añadir nuevo tipo',
@@ -976,7 +967,7 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
                               onChange={(value) => {
                                 setComplementoTipoId(value || '');
                                 setCreandoTipo(value === '__new');
-                            setComplementoImporte('');
+                                setComplementoImporte('');
                               }}
                               placeholder="Seleccionar tipo existente"
                               label="Seleccionar tipo de complemento"
@@ -1209,134 +1200,26 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
 
         {/* Jornada */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Jornada</h3>
-
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Jornada asignada</label>
-              {canManageJornadas ? (
-                jornadas.length === 0 ? (
-                  <Input
-                    type="text"
-                    value={
-                      jornadaActual
-                        ? `${jornadaActual.nombre} (${jornadaActual.horasSemanales}h/semana)`
-                        : 'Sin jornadas disponibles'
-                    }
-                    readOnly
-                    className="bg-gray-50"
-                  />
-                ) : (
-                  <SearchableSelect
-                    items={jornadas.map((jornada) => ({
-                      value: jornada.id,
-                      label: jornada.horasSemanales
-                        ? `${jornada.nombre} (${jornada.horasSemanales}h/semana)`
-                        : jornada.nombre || 'Jornada sin nombre',
-                    }))}
-                    value={jornadaSeleccionada}
-                    onChange={handleJornadaChange}
-                    placeholder="Seleccionar jornada"
-                    label="Seleccionar jornada"
-                    disabled={updatingField === 'jornadaId'}
-                  />
-                )
-              ) : (
-                <Input
-                  type="text"
-                  value={
-                    jornadaActual
-                      ? `${jornadaActual.nombre} (${jornadaActual.horasSemanales}h/semana)`
-                      : 'No asignada'
-                  }
-                  readOnly
-                  className="bg-gray-50"
-                />
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Horas semanales</label>
-                <Input
-                  type="text"
-                  value={jornadaActual?.horasSemanales || empleado.jornada?.horasSemanales || '-'}
-                  readOnly
-                  className="bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unidad</label>
-                <Input type="text" value="semana" readOnly className="bg-gray-50" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Días laborables</label>
-              <div className="flex gap-2">
-                {DIA_KEYS.map((dia) => {
-                  const diaConfig = jornadaActual?.config?.[dia] as DiaConfig | undefined;
-                  const activo = diaConfig?.activo ?? Boolean(diaConfig?.entrada || diaConfig?.salida) ?? false;
-                  
-                  return (
-                    <div
-                      key={dia}
-                      className={`flex-1 text-center text-sm font-medium ${
-                        activo ? 'text-gray-900' : 'text-gray-400'
-                      }`}
-                    >
-                      {DIA_INICIAL[dia]}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Jornada</h3>
+            {canManageJornadas && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setJornadasModalOpen(true)}
+                disabled={loadingJornadaEfectiva}
+              >
+                Gestionar Jornadas
+              </Button>
+            )}
           </div>
-        </div>
-      </div>
 
-      {/* Información del Contrato */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Información del Contrato</h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de inicio del contrato</label>
-            <Input
-              type="text"
-              value={
-                fechaInicioContrato
-                  ? new Date(fechaInicioContrato).toLocaleDateString('es-ES')
-                  : 'No registrado'
-              }
-              readOnly
-              className="bg-gray-50"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de fin del contrato</label>
-            <Input
-              type="text"
-              value={
-                fechaFinContrato
-                  ? new Date(fechaFinContrato).toLocaleDateString('es-ES')
-                  : tipoContrato === 'indefinido'
-                    ? 'Indefinido'
-                    : 'No especificada'
-              }
-              readOnly
-              className="bg-gray-50"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Estado (empleado y contrato)</label>
-            <Input
-              type="text"
-              value={estadoEmpleado}
-              readOnly
-              className="bg-gray-50"
-            />
-          </div>
+          <JornadaDisplay
+            jornada={jornadaEfectivaInfo?.jornada || null}
+            origen={jornadaEfectivaInfo?.origen || null}
+            equipoNombre={jornadaEfectivaInfo?.equipoNombre}
+            loading={loadingJornadaEfectiva}
+          />
         </div>
       </div>
 
@@ -1476,6 +1359,18 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
           onSuccess={() => {
             // Recargar la página para mostrar los cambios
             router.refresh();
+          }}
+        />
+      )}
+
+      {/* Modal Gestionar Jornadas */}
+      {canManageJornadas && (
+        <JornadasModal
+          open={jornadasModalOpen}
+          onClose={() => {
+            setJornadasModalOpen(false);
+            // Recargar jornada efectiva después de cerrar el modal
+            void fetchJornadaEfectiva();
           }}
         />
       )}

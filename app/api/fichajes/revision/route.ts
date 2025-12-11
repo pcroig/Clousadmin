@@ -519,15 +519,9 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          await prisma.fichajes.update({
+          // FASE A.5: Eliminar fichaje en vez de marcar como finalizado
+          await prisma.fichajes.delete({
             where: { id: fichajeId },
-            data: {
-              estado: 'finalizado',
-              horasTrabajadas: 0,
-              horasEnPausa: 0,
-              autoCompletado: false,
-              fechaAprobacion: new Date(),
-            },
           });
 
           actualizados++;

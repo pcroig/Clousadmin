@@ -6,12 +6,14 @@
 
 'use client';
 
+import { format } from 'date-fns';
 import { ChevronDown, ChevronUp, HelpCircle, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { Button } from '@/components/ui/button';
 import {
   Field,
@@ -77,6 +79,13 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
   const [equipos, setEquipos] = useState<Array<{ id: string; nombre: string }>>([]);
   const [puestos, setPuestos] = useState<Array<{ id: string; nombre: string }>>([]);
   const [showImportSection, setShowImportSection] = useState(false);
+  const parseDateValue = (value?: string) => (value ? new Date(`${value}T00:00:00`) : undefined);
+  const updateDateField = (field: 'fechaAlta' | 'fechaNacimiento', date: Date | undefined) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: date ? format(date, 'yyyy-MM-dd') : '',
+    }));
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -340,11 +349,11 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
           </div>
           <div>
             <Label htmlFor="fechaAlta">Fecha de Alta</Label>
-            <Input
-              id="fechaAlta"
-              type="date"
-              value={formData.fechaAlta}
-              onChange={(e) => setFormData({ ...formData, fechaAlta: e.target.value })}
+            <ResponsiveDatePicker
+              date={parseDateValue(formData.fechaAlta)}
+              onSelect={(date) => updateDateField('fechaAlta', date)}
+              placeholder="Seleccionar fecha"
+              label="Seleccionar fecha de alta"
             />
           </div>
         </div>
@@ -372,11 +381,11 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
           </div>
           <div>
             <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
-            <Input
-              id="fechaNacimiento"
-              type="date"
-              value={formData.fechaNacimiento}
-              onChange={(e) => setFormData({ ...formData, fechaNacimiento: e.target.value })}
+            <ResponsiveDatePicker
+              date={parseDateValue(formData.fechaNacimiento)}
+              onSelect={(date) => updateDateField('fechaNacimiento', date)}
+              placeholder="Seleccionar fecha"
+              label="Seleccionar fecha de nacimiento"
             />
           </div>
           <div>
@@ -536,7 +545,7 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
             </InputGroup>
           </Field>
           <div>
-            <Label htmlFor="bic">Código BIC</Label>
+            <Label htmlFor="bic">BIC/SWIFT</Label>
             <Input
               id="bic"
               value={formData.bic}

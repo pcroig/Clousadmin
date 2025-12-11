@@ -11,6 +11,8 @@ import { prisma } from '@/lib/prisma';
 
 import { IntegrationsClient } from './integrations-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
 
 export default async function IntegrationsPage() {
   const session = await getSession();

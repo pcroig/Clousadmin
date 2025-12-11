@@ -24,11 +24,10 @@ export async function GET(req: NextRequest) {
         apellidos: true,
         email: true,
         empresaId: true,
-        jornada: {
+        jornadaId: true,
+        equipos: {
           select: {
-            id: true,
-            horasSemanales: true,
-            config: true,
+            equipoId: true,
           },
         },
       },
@@ -38,10 +37,43 @@ export async function GET(req: NextRequest) {
       return notFoundResponse('Empleado no encontrado');
     }
 
-    // Generate 'nombre' and 'etiqueta' fields for jornada if it exists
+    // Resolver jornada efectiva (individual > equipo > empresa)
+    const equipoIds = empleado.equipos
+      .map(eq => eq.equipoId)
+      .filter((id): id is string => Boolean(id));
+
+    const { obtenerJornadaEmpleado } = await import('@/lib/jornadas/helpers');
+    const jornadaInfo = await obtenerJornadaEmpleado({
+      empleadoId: empleado.id,
+      equipoIds,
+      jornadaIdDirecta: empleado.jornadaId,
+    });
+
+    // Obtener datos completos de la jornada si existe
+    let jornadaConNombre = null;
+    if (jornadaInfo && jornadaInfo.jornadaId) {
+      const jornada = await prisma.jornadas.findUnique({
+        where: { id: jornadaInfo.jornadaId },
+        select: {
+          id: true,
+          horasSemanales: true,
+          config: true,
+        },
+      });
+
+      if (jornada) {
+        jornadaConNombre = mapJornadaConNombreYEtiqueta(jornada);
+      }
+    }
+
+    // Construir respuesta
     const empleadoConJornadaNombre = {
-      ...empleado,
-      jornada: empleado.jornada ? mapJornadaConNombreYEtiqueta(empleado.jornada) : null,
+      id: empleado.id,
+      nombre: empleado.nombre,
+      apellidos: empleado.apellidos,
+      email: empleado.email,
+      empresaId: empleado.empresaId,
+      jornada: jornadaConNombre,
     };
 
     return successResponse(empleadoConJornadaNombre);

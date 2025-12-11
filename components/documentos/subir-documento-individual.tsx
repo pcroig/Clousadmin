@@ -4,6 +4,7 @@
 // Subir Documento Individual - Con Extracción IA
 // ========================================
 
+import { format } from 'date-fns';
 import { AlertCircle, CheckCircle, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -11,6 +12,7 @@ import { toast } from 'sonner';
 
 import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { SearchableSelect } from '@/components/shared/searchable-select';
 import {
   Accordion,
@@ -101,6 +103,10 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
   const [puestos, setPuestos] = useState<Puesto[]>([]);
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [sedes, setSedes] = useState<Sede[]>([]);
+
+  const parseDateValue = (value?: string) => (value ? new Date(`${value}T00:00:00`) : undefined);
+  const updateDatosExtraidosDate = (field: 'fechaAlta' | 'fechaNacimiento', date: Date | undefined) =>
+    setDatosExtraidos((prev) => (prev ? { ...prev, [field]: date ? format(date, 'yyyy-MM-dd') : '' } : prev));
 
   // Cargar puestos, equipos y sedes al montar
   useEffect(() => {
@@ -451,11 +457,11 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
 
               <div>
                 <Label htmlFor="fechaAlta">Fecha de Alta</Label>
-                <Input
-                  id="fechaAlta"
-                  type="date"
-                  value={datosExtraidos.fechaAlta || ''}
-                  onChange={(e) => setDatosExtraidos({ ...datosExtraidos, fechaAlta: e.target.value })}
+                <ResponsiveDatePicker
+                  date={parseDateValue(datosExtraidos.fechaAlta)}
+                  onSelect={(date) => updateDatosExtraidosDate('fechaAlta', date)}
+                  placeholder="Seleccionar fecha"
+                  label="Seleccionar fecha de alta"
                 />
               </div>
 
@@ -502,7 +508,7 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
                 <AccordionContent>
                   <div className="grid grid-cols-2 gap-4 pt-2">
                     <div>
-                      <Label>NIF/DNI/NIE</Label>
+                      <Label>DNI/NIE</Label>
                       <Input
                         value={datosExtraidos.nif || ''}
                         onChange={(e) => setDatosExtraidos({ ...datosExtraidos, nif: e.target.value })}
@@ -511,7 +517,7 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
                     </div>
 
                     <div>
-                      <Label>NSS</Label>
+                      <Label>Número de Seguridad Social</Label>
                       <Input
                         value={datosExtraidos.nss || ''}
                         onChange={(e) => setDatosExtraidos({ ...datosExtraidos, nss: e.target.value })}
@@ -521,10 +527,11 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
 
                     <div>
                       <Label>Fecha de Nacimiento</Label>
-                      <Input
-                        type="date"
-                        value={datosExtraidos.fechaNacimiento || ''}
-                        onChange={(e) => setDatosExtraidos({ ...datosExtraidos, fechaNacimiento: e.target.value })}
+                      <ResponsiveDatePicker
+                        date={parseDateValue(datosExtraidos.fechaNacimiento)}
+                        onSelect={(date) => updateDatosExtraidosDate('fechaNacimiento', date)}
+                        placeholder="Seleccionar fecha"
+                        label="Seleccionar fecha de nacimiento"
                       />
                     </div>
 

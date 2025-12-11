@@ -61,7 +61,7 @@ const DEPENDENCIAS_VARIABLES: DependenciaVariable[] = [
     variable: 'empleado_bic',
     grupo: 'datos_bancarios',
     campo: 'bic',
-    label: 'Código BIC',
+    label: 'BIC/SWIFT',
   },
 ];
 

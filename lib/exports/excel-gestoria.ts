@@ -86,8 +86,8 @@ async function agregarHojaResumen(
   // Header
   data.push([
     'Empleado',
-    'NIF',
-    'NSS',
+    'DNI/NIE',
+    'Número de Seguridad Social',
     'IBAN',
     'Salario Base',
     'Días Laborables',
@@ -141,8 +141,8 @@ async function agregarHojaResumen(
   // Ajustar ancho de columnas
   worksheet['!cols'] = [
     { wch: 30 }, // Empleado
-    { wch: 12 }, // NIF
-    { wch: 15 }, // NSS
+    { wch: 12 }, // DNI/NIE
+    { wch: 22 }, // Número de Seguridad Social
     { wch: 30 }, // IBAN
     { wch: 15 }, // Salario
     { wch: 18 }, // Días Laborables

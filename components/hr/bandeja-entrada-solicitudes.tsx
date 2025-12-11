@@ -117,7 +117,7 @@ const CAMPO_CAMBIO_LABELS: Record<string, string> = {
   iban: 'IBAN',
   entidad: 'entidad bancaria',
   banco: 'banco',
-  bic: 'código BIC',
+  bic: 'BIC/SWIFT',
   salarioBaseAnual: 'salario base anual',
   salarioBaseMensual: 'salario base mensual',
   categoriaProfesional: 'categoría profesional',
@@ -128,8 +128,8 @@ const CAMPO_CAMBIO_LABELS: Record<string, string> = {
   fechaAlta: 'fecha de alta',
   estadoCivil: 'estado civil',
   numeroHijos: 'número de hijos',
-  nif: 'NIF',
-  nss: 'NSS',
+  nif: 'DNI/NIE',
+  nss: 'Número de Seguridad Social',
 };
 
 const getCambioCategoria = (tipo?: string) => {

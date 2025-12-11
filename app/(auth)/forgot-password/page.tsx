@@ -8,6 +8,9 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { ForgotPasswordForm } from './forgot-password-form';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function ForgotPasswordPage() {
   const session = await getSession();
 

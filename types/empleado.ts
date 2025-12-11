@@ -104,6 +104,12 @@ export interface MiEspacioManager {
   apellidos?: string;
 }
 
+export interface MiEspacioSede {
+  id: string;
+  nombre: string;
+  ciudad: string;
+}
+
 export interface MiEspacioEquipoResumen {
   equipoId: string | null;
   nombre?: string | null;
@@ -197,6 +203,8 @@ export interface MiEspacioEmpleado {
   jornadaId?: string | null;
   jornada?: MiEspacioJornada | null;
   manager?: MiEspacioManager | null;
+  sedeId?: string | null;
+  sede?: MiEspacioSede | null;
   tipoContrato?: string | null;
   categoriaProfesional?: string | null;
   nivelEducacion?: string | null;

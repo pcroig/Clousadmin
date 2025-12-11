@@ -13,6 +13,9 @@ import { formatAusenciaTipo } from '@/lib/utils/formatters';
 import type { TipoNotificacion } from '@/lib/notificaciones';
 import type { NotificacionUI } from '@/types/Notificacion';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function ManagerBandejaEntradaPage(props: {
   searchParams: Promise<{ tab?: string }>;
 }) {

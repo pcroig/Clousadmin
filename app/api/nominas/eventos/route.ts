@@ -7,9 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
-import { generarPrenominasEvento } from '@/lib/calculos/generar-prenominas';
-import { UsuarioRol } from '@/lib/constants/enums';
-import { crearNotificacionComplementosPendientes } from '@/lib/notificaciones';
+import { crearNominasBase } from '@/lib/calculos/crear-nominas-base';
 import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
 
@@ -17,6 +15,7 @@ const GenerarEventoSchema = z.object({
   mes: z.number().int().min(1).max(12),
   anio: z.number().int().min(2020).max(2100),
   fechaLimiteComplementos: z.string().datetime().optional(),
+  compensarHoras: z.boolean().optional().default(false),
 });
 
 // ========================================
@@ -165,10 +164,10 @@ export async function GET(req: NextRequest) {
 // ========================================
 // POST /api/nominas/eventos
 // ========================================
-// Genera un nuevo evento de nómina mensual
-// 1. Crea el evento
-// 2. SIEMPRE genera pre-nóminas para todos los empleados activos (estado: pendiente)
-// 3. Envía notificaciones a managers
+// Crea un nuevo evento de nómina mensual Y genera nóminas base automáticamente
+// 1. Crea el evento en estado "pendiente"
+// 2. Genera nóminas base para todos los empleados activos (con salario, días, alertas)
+// 3. El usuario luego ejecuta "Generar Pre-nóminas" para completar los cálculos
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -203,86 +202,54 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Calcular fecha límite por defecto (último día del mes)
+    // Calcular fecha límite por defecto (5 del mes siguiente)
     const fechaLimite = data.fechaLimiteComplementos
       ? new Date(data.fechaLimiteComplementos)
-      : new Date(data.anio, data.mes, 0, 23, 59, 59); // Último día del mes
+      : new Date(data.anio, data.mes, 5); // 5 del mes siguiente
 
-    // Crear el evento de nómina (estado: abierto)
-    const evento = await prisma.eventos_nomina.create({
-      data: {
-        empresaId: session.user.empresaId,
-        mes: data.mes,
-        anio: data.anio,
-        estado: 'abierto',
-        fechaLimiteComplementos: fechaLimite,
-        totalEmpleados: 0,
-      },
-    });
+    // ✅ Usar transacción para garantizar atomicidad
+    const { evento: eventoActualizado, resultado } = await prisma.$transaction(async (tx) => {
+      // 1. Crear el evento de nómina en estado "pendiente"
+      const evento = await tx.eventos_nomina.create({
+        data: {
+          empresaId: session.user.empresaId,
+          mes: data.mes,
+          anio: data.anio,
+          estado: 'pendiente',
+          compensarHoras: data.compensarHoras || false,
+          fechaLimiteComplementos: fechaLimite,
+          totalEmpleados: 0,
+          prenominasGeneradas: 0,
+        },
+      });
 
-    let resultadoGeneracion: Awaited<
-      ReturnType<typeof generarPrenominasEvento>
-    >;
-    try {
-      resultadoGeneracion = await generarPrenominasEvento({
+      // 2. ✅ Crear nóminas base automáticamente para todos los empleados activos
+      const resultado = await crearNominasBase({
         eventoId: evento.id,
         empresaId: session.user.empresaId,
         mes: data.mes,
         anio: data.anio,
       });
-    } catch (error) {
-      await prisma.eventos_nomina.delete({ where: { id: evento.id } }).catch(() => {});
-      throw error;
-    }
 
-    const eventoActualizado = await prisma.eventos_nomina.findUnique({
-      where: { id: evento.id },
-    });
-
-    if (!eventoActualizado) {
-      throw new Error('No se pudo recuperar el evento generado');
-    }
-
-    // Enviar notificaciones a los managers para completar complementos
-    const managers = await prisma.empleados.findMany({
-      where: {
-        empresaId: session.user.empresaId,
-        usuario: {
-          rol: UsuarioRol.manager,
-          activo: true,
+      // 3. Actualizar evento con estadísticas
+      const eventoActualizado = await tx.eventos_nomina.update({
+        where: { id: evento.id },
+        data: {
+          totalEmpleados: resultado.empleadosActivos,
+          prenominasGeneradas: resultado.nominasCreadas,
+          empleadosConComplementos: resultado.empleadosConComplementos,
         },
-      },
-      select: {
-        id: true,
-      },
-    });
+      });
 
-    if (resultadoGeneracion.empleadosConComplementos > 0) {
-      await Promise.all(
-        managers.map((manager) =>
-          crearNotificacionComplementosPendientes(
-            prisma,
-            {
-              nominaId: evento.id,
-              empresaId: session.user.empresaId,
-              managerId: manager.id,
-              empleadosCount: resultadoGeneracion.empleadosConComplementos,
-              mes: data.mes,
-              año: data.anio,
-            },
-            { actorUsuarioId: session.user.id }
-          )
-        )
-      );
-    }
+      return { evento: eventoActualizado, resultado };
+    });
 
     return NextResponse.json(
       {
         evento: eventoActualizado,
-        nominasGeneradas: resultadoGeneracion.prenominasCreadas,
-        prenominasVinculadas: resultadoGeneracion.prenominasVinculadas,
-        notificacionesEnviadas:
-          resultadoGeneracion.empleadosConComplementos > 0 ? managers.length : 0,
+        resultado,
+        message: `Evento creado con ${resultado.nominasCreadas} nóminas base. ` +
+          `Revisa complementos y alertas antes de generar pre-nóminas.`,
       },
       { status: 201 }
     );

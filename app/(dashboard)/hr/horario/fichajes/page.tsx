@@ -9,6 +9,9 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { FichajesClient } from './fichajes-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function FichajesPage(props: {
   searchParams: Promise<{ estado?: string }>;

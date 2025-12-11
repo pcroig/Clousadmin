@@ -81,18 +81,24 @@ export function formatTiempoTrabajado(diffMs: number): string {
 
 /**
  * Convierte horas decimales a formato "Xh Ym" (sin segundos)
- * Ejemplo: 8.5 → "8h 30m"
+ * Ejemplo: 8.5 → "8h 30m", -7.48 → "-7h 29m"
+ *
+ * FIX: Usar Math.trunc() en lugar de Math.floor() para números negativos
+ * Math.floor(-7.48) = -8 ❌ (redondea hacia más negativo)
+ * Math.trunc(-7.48) = -7 ✅ (trunca hacia cero)
  */
 export function formatearHorasMinutos(horas: number | string | null | undefined): string {
   if (horas === null || horas === undefined) return '0h 0m';
-  
+
   const horasNum = typeof horas === 'string' ? parseFloat(horas) : horas;
-  
+
   if (isNaN(horasNum)) return '0h 0m';
-  
-  const horasEnteras = Math.floor(horasNum);
-  const minutos = Math.round((horasNum - horasEnteras) * 60);
-  
+
+  // FIX CRÍTICO: Usar Math.trunc() para números negativos
+  // Math.floor() redondea hacia abajo (más negativo), causando errores con negativos
+  const horasEnteras = Math.trunc(horasNum);
+  const minutos = Math.round(Math.abs((horasNum - horasEnteras) * 60));
+
   return `${horasEnteras}h ${minutos}m`;
 }
 

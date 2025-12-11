@@ -1,7 +1,21 @@
 # Referencia API - Fichajes
 
-**Última actualización:** 4 de diciembre de 2025  
+**Última actualización:** 10 de diciembre de 2025
 **Estado:** Resumen. Para la funcionalidad completa consulta [`docs/funcionalidades/fichajes.md`](../../funcionalidades/fichajes.md).
+
+## 📢 Actualizaciones Importantes (Diciembre 2025)
+
+### Sistema de Edición por Lotes (9 Dic 2025)
+- ✅ **Nuevo**: `POST /api/fichajes/editar-batch` - Edición optimista con aprobación
+- ✅ **Nuevo**: `POST /api/notificaciones/[id]/rechazar-edicion` - Reversión de cambios
+- ✅ Nueva tabla `ediciones_fichaje_pendientes` para tracking de ediciones
+- ✅ Notificaciones automáticas HR → Empleado con opción de rechazo (48h)
+
+### Fases A-D: Correcciones Críticas (9-10 Dic 2025)
+- ✅ **Fase A**: Descartar fichajes usa DELETE, histórico sin filtro día semana, cierre automático de fichajes
+- ✅ **Fase B**: Workers background para cálculo de eventos propuestos
+- ✅ **Fase C**: Validaciones críticas en modal, confirmación salida sin descanso, indicador tiempo real
+- ✅ **Fase D**: Campo `horaOriginal` preservado, sistema de notificaciones completo
 
 ---
 
@@ -22,6 +36,8 @@
 | `/api/fichajes/balance/{empleadoId}` | GET | Balance de horas |
 | `/api/fichajes/correccion` | POST | Solicitar corrección |
 | `/api/fichajes/bolsa-horas` | GET | Bolsa de horas para HR |
+| `/api/fichajes/editar-batch` | POST | **NUEVO**: Editar fichaje por lotes con aprobación optimista (HR/Manager). Valida secuencia, bloquea ediciones concurrentes |
+| `/api/notificaciones/{id}/rechazar-edicion` | POST | **NUEVO**: Rechazar edición de fichaje (Empleado). Revierte TODOS los cambios aplicados |
 | `/api/empleados/{id}/renovar-saldo` | POST | Renovar saldo de horas (HR Admin) |
 | `/api/empleados/{id}/renovar-saldo` | GET | Obtener fecha de última renovación |
 | `/api/jornadas/asegurar-empleados` | POST | Asignar jornada por defecto a empleados sin jornada |

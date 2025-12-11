@@ -80,9 +80,12 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
     const accionUrl = notif.metadata?.accionUrl;
     if (!accionUrl) return undefined;
 
+    // Cast metadata to Record<string, unknown> para acceder a propiedades dinámicas
+    const metadata = notif.metadata as Record<string, unknown> | undefined;
+
     // Corregir notificaciones de firma_completada que apuntan a /hr/documentos
     if (notif.tipo === 'firma_completada') {
-      const solicitudId = notif.metadata?.solicitudId as string | undefined;
+      const solicitudId = metadata?.solicitudId as string | undefined;
       if (solicitudId && accionUrl === '/hr/documentos') {
         return `/firma/solicitud/${solicitudId}`;
       }
@@ -95,7 +98,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
 
     // Corregir notificaciones de campañas con URLs viejas
     if (notif.tipo === 'campana_vacaciones_creada' || notif.tipo === 'campana_vacaciones_completada') {
-      const campanaId = notif.metadata?.campanaId as string | undefined;
+      const campanaId = metadata?.campanaId as string | undefined;
       if (campanaId && accionUrl.includes('/vacaciones/campanas/')) {
         return `/hr/horario/ausencias?campana=${campanaId}`;
       }
@@ -106,7 +109,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
 
     // Corregir notificaciones de onboarding_completado con URL vieja
     if (notif.tipo === 'onboarding_completado') {
-      const empleadoId = notif.metadata?.empleadoId as string | undefined;
+      const empleadoId = metadata?.empleadoId as string | undefined;
       if (empleadoId && accionUrl === `/hr/empleados/${empleadoId}`) {
         return `/hr/organizacion/personas/${empleadoId}`;
       }
@@ -216,7 +219,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
       useScroll={tieneNotificaciones}
       headerAction={
         <div className="flex items-center gap-2">
-          {notificacionesNoLeidas.length > 0 && filtro !== 'leidas' && (
+          {notificacionesNoLeidas.length > 0 && (
             <button
               onClick={handleMarcarTodasLeidas}
               disabled={marcandoLeidas}

@@ -7,6 +7,9 @@ import { prisma } from '@/lib/prisma';
 
 import { SignupForm } from './signup-form';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 interface SignupPageProps {
   searchParams: Promise<{ token?: string }>;

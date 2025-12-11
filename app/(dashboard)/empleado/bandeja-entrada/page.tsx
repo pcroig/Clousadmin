@@ -11,6 +11,9 @@ import { formatAusenciaTipo } from '@/lib/utils/formatters';
 
 import { BandejaEntradaEmpleadoClient } from './bandeja-entrada-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function EmpleadoBandejaEntradaPage() {
   const session = await getSession();

@@ -377,18 +377,47 @@ export async function POST(req: NextRequest) {
     // 5. Determinar tipo de fichaje
     const tipoFichaje = validatedData.tipoFichaje || 'ordinario';
 
-    // 6. Cargar empleado
+    // 6. Cargar empleado con sus equipos
     const empleado = await prisma.empleados.findUnique({
       where: { id: targetEmpleadoId, empresaId: session.user.empresaId },
       select: {
         empresaId: true,
         jornadaId: true,
         jornada: { select: { activa: true } },
+        equipos: {
+          select: { equipoId: true },
+        },
       },
     });
 
     if (!empleado) {
       return badRequestResponse('Empleado no encontrado en tu empresa');
+    }
+
+    // 6b. Resolver jornada efectiva (individual > equipo > empresa)
+    const equipoIds = empleado.equipos
+      .map(eq => eq.equipoId)
+      .filter((id): id is string => Boolean(id));
+
+    const { obtenerJornadaEmpleado } = await import('@/lib/jornadas/helpers');
+    const jornadaInfo = await obtenerJornadaEmpleado({
+      empleadoId: targetEmpleadoId,
+      equipoIds,
+      jornadaIdDirecta: empleado.jornadaId,
+    });
+
+    // Obtener datos completos de la jornada efectiva
+    let jornadaEfectiva = null;
+    if (jornadaInfo && jornadaInfo.jornadaId) {
+      jornadaEfectiva = await prisma.jornadas.findUnique({
+        where: { id: jornadaInfo.jornadaId },
+        select: {
+          id: true,
+          horasSemanales: true,
+          config: true,
+          activa: true,
+        },
+      });
     }
 
     // ============================================
@@ -444,13 +473,13 @@ export async function POST(req: NextRequest) {
       // FLUJO ORDINARIO (código original)
       // ============================================
 
-      // Validar que el empleado tiene jornada asignada
-      if (!empleado.jornadaId) {
+      // Validar que el empleado tiene jornada asignada (efectiva)
+      if (!jornadaEfectiva) {
         return badRequestResponse('No tienes una jornada laboral asignada. Contacta con HR para que te asignen una jornada antes de fichar.');
       }
 
       // Validar que la jornada esté activa
-      if (!empleado.jornada || !empleado.jornada.activa) {
+      if (!jornadaEfectiva.activa) {
         return badRequestResponse('Tu jornada laboral está inactiva. Contacta con HR para que te asignen una jornada activa.');
       }
 
@@ -474,6 +503,28 @@ export async function POST(req: NextRequest) {
             },
             { status: 400 }
           );
+        }
+      }
+
+      // Validar límites globales empresa (si existen)
+      const empresa = await prisma.empresas.findUnique({
+        where: { id: empleado.empresaId },
+        select: { config: true },
+      });
+
+      const empresaConfig = empresa?.config as {
+        limiteInferiorFichaje?: string;
+        limiteSuperiorFichaje?: string;
+      } | null;
+
+      if (empresaConfig?.limiteInferiorFichaje || empresaConfig?.limiteSuperiorFichaje) {
+        const horaFichaje = `${hora.getHours().toString().padStart(2, '0')}:${hora.getMinutes().toString().padStart(2, '0')}`;
+
+        if (empresaConfig.limiteInferiorFichaje && horaFichaje < empresaConfig.limiteInferiorFichaje) {
+          return badRequestResponse(`No puedes fichar antes de ${empresaConfig.limiteInferiorFichaje}`);
+        }
+        if (empresaConfig.limiteSuperiorFichaje && horaFichaje > empresaConfig.limiteSuperiorFichaje) {
+          return badRequestResponse(`No puedes fichar después de ${empresaConfig.limiteSuperiorFichaje}`);
         }
       }
 
@@ -542,59 +593,60 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 7. Crear evento dentro del fichaje
-    const _evento = await prisma.fichaje_eventos.create({
-      data: {
-        fichajeId: fichaje.id,
-        tipo: validatedData.tipo,
-        hora,
-        ubicacion: validatedData.ubicacion,
-      },
-    });
+    // 7. Crear evento y actualizar fichaje en TRANSACCIÓN (previene race conditions)
+    const fichajeActualizado = await prisma.$transaction(async (tx) => {
+      // 7a. Crear evento dentro del fichaje
+      await tx.fichaje_eventos.create({
+        data: {
+          fichajeId: fichaje.id,
+          tipo: validatedData.tipo,
+          hora,
+          ubicacion: validatedData.ubicacion,
+        },
+      });
 
-    // 8. Actualizar cálculos del fichaje
-    // Obtener todos los eventos incluyendo el recién creado
-    const todosEventos = await prisma.fichaje_eventos.findMany({
-      where: { fichajeId: fichaje.id },
-      orderBy: { hora: 'asc' },
-    });
-    
-    const horasTrabajadas = calcularHorasTrabajadas(todosEventos) ?? 0;
-    const horasEnPausa = calcularTiempoEnPausa(todosEventos);
+      // 7b. Obtener todos los eventos incluyendo el recién creado
+      const todosEventos = await tx.fichaje_eventos.findMany({
+        where: { fichajeId: fichaje.id },
+        orderBy: { hora: 'asc' },
+      });
 
-    // 9. Validar si el fichaje está completo después de agregar el evento
-    // Si es salida, validar si el fichaje está completo según la jornada
-    let nuevoEstado = fichaje.estado;
-    if (validatedData.tipo === 'salida') {
-      // Validar si el fichaje está completo según la jornada
-      const validacion = await validarFichajeCompleto(fichaje.id);
-      
-      if (validacion.completo) {
-        nuevoEstado = EstadoFichaje.finalizado;
+      const horasTrabajadas = calcularHorasTrabajadas(todosEventos) ?? 0;
+      const horasEnPausa = calcularTiempoEnPausa(todosEventos);
+
+      // 7c. Validar si el fichaje está completo después de agregar el evento
+      let nuevoEstado = fichaje.estado;
+      if (validatedData.tipo === 'salida') {
+        // Validar si el fichaje está completo según la jornada
+        const validacion = await validarFichajeCompleto(fichaje.id);
+
+        if (validacion.completo) {
+          nuevoEstado = EstadoFichaje.finalizado;
+        }
       }
-    }
 
-    // 10. Actualizar fichaje con cálculos y estado
-    const fichajeActualizado = await prisma.fichajes.update({
-      where: { id: fichaje.id },
-      data: {
-        horasTrabajadas,
-        horasEnPausa,
-        estado: nuevoEstado,
-      },
-      include: {
-        eventos: {
-          orderBy: {
-            hora: 'asc',
+      // 7d. Actualizar fichaje con cálculos y estado
+      return await tx.fichajes.update({
+        where: { id: fichaje.id },
+        data: {
+          horasTrabajadas,
+          horasEnPausa,
+          estado: nuevoEstado,
+        },
+        include: {
+          eventos: {
+            orderBy: {
+              hora: 'asc',
+            },
+          },
+          empleado: {
+            select: {
+              nombre: true,
+              apellidos: true,
+            },
           },
         },
-        empleado: {
-          select: {
-            nombre: true,
-            apellidos: true,
-          },
-        },
-      },
+      });
     });
 
     return createdResponse(fichajeActualizado);

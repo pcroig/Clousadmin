@@ -219,10 +219,11 @@ export function validarWorkflowAccion(accion: unknown): accion is WorkflowAccion
 }
 
 /**
- * Campos disponibles para rellenar
+ * Campos disponibles para rellenar por el empleado en el onboarding
+ * (salarioBaseAnual y tipoContrato se gestionan directamente por HR admin)
  */
 export const CAMPOS_DISPONIBLES = [
-  { id: 'nif', label: 'NIF/DNI/NIE' },
+  { id: 'nif', label: 'DNI/NIE' },
   { id: 'nss', label: 'Número de Seguridad Social' },
   { id: 'fechaNacimiento', label: 'Fecha de Nacimiento' },
   { id: 'telefono', label: 'Teléfono' },
@@ -234,6 +235,4 @@ export const CAMPOS_DISPONIBLES = [
   { id: 'direccionProvincia', label: 'Provincia' },
   { id: 'iban', label: 'IBAN' },
   { id: 'bic', label: 'BIC/SWIFT' },
-  { id: 'salarioBaseAnual', label: 'Salario Base Anual' },
-  { id: 'tipoContrato', label: 'Tipo de Contrato' },
 ] as const;

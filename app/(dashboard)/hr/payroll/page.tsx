@@ -9,6 +9,9 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { PayrollClient } from './payroll-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function PayrollPage() {
   const session = await getSession();

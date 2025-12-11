@@ -48,7 +48,7 @@ export function SolicitarFirmaStep({
       const response = await fetch(`/api/onboarding/${token}/solicitudes-firma`);
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as { solicitudes?: SolicitudFirma[] };
         setSolicitudes(data.solicitudes || []);
       }
     } catch (error) {

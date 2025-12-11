@@ -1,5 +1,8 @@
 import { redirect } from 'next/navigation';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function MiPerfilPage(props: {
   searchParams: Promise<{ modal?: string }>;
 }) {

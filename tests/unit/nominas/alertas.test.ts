@@ -100,7 +100,7 @@ describe('Sistema de Alertas de Nóminas', () => {
       });
     });
 
-    describe('NSS (Número Seguridad Social)', () => {
+    describe('NSS (Número de Seguridad Social)', () => {
       it('debe considerar válido un NSS español (12 dígitos)', () => {
         const nss = '281234567890';
         expect(nss).toMatch(/^\d{12}$/);

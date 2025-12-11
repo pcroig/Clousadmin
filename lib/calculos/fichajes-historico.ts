@@ -15,9 +15,11 @@ import type { fichaje_eventos as FichajeEvento } from '@prisma/client';
  */
 export interface PromedioEventos {
   entrada: Date | null;
+  salida: Date | null;
+  pausas?: Array<{ inicio: Date; fin: Date }>; // Soporte para múltiples pausas (opcional para compatibilidad)
+  // DEPRECATED: Mantener para compatibilidad con código existente
   pausa_inicio: Date | null;
   pausa_fin: Date | null;
-  salida: Date | null;
 }
 
 /**
@@ -49,12 +51,154 @@ function calcularPromedioHora(horas: Date[], fechaBase: Date): Date | null {
 }
 
 /**
+ * Crea una fecha con hora a partir de minutos desde medianoche
+ */
+function crearHoraDesdeMinutos(fecha: Date, minutos: number): Date {
+  const horas = Math.floor(minutos / 60);
+  const mins = minutos % 60;
+  return crearFechaConHora(fecha, horas, mins);
+}
+
+/**
+ * Detecta pausas en fichajes históricos y determina si hay patrón de 1 o 2 pausas
+ */
+function detectarPausas(
+  fichajes: Array<{ eventos: FichajeEvento[] }>,
+  fechaBase: Date
+): Array<{ inicio: Date; fin: Date }> {
+  // Contar pausas por fichaje
+  const pausasPorFichaje = fichajes.map(f => {
+    const inicios = f.eventos.filter(e => e.tipo === 'pausa_inicio');
+    return inicios.length;
+  });
+
+  if (pausasPorFichaje.length === 0) return [];
+
+  const promedioPausas = pausasPorFichaje.reduce((a, b) => a + b, 0) / pausasPorFichaje.length;
+
+  if (promedioPausas >= 1.5) {
+    // Patrón de 2 pausas → Agrupar por horario
+    return agruparPausasPorHorario(fichajes, fechaBase);
+  } else if (promedioPausas >= 0.5) {
+    // Patrón de 1 pausa → Calcular promedio
+    const pausaUnica = calcularPromedioPausaUnica(fichajes, fechaBase);
+    return pausaUnica ? [pausaUnica] : [];
+  }
+
+  return []; // Sin patrón claro
+}
+
+/**
+ * Agrupa pausas por horario cuando hay patrón de 2 pausas
+ */
+function agruparPausasPorHorario(
+  fichajes: Array<{ eventos: FichajeEvento[] }>,
+  fechaBase: Date
+): Array<{ inicio: Date; fin: Date }> {
+  // Extraer todos los pares (pausa_inicio, pausa_fin)
+  const pares: Array<{ inicio: number; fin: number }> = [];
+
+  for (const f of fichajes) {
+    const inicios = f.eventos.filter(e => e.tipo === 'pausa_inicio');
+    const fines = f.eventos.filter(e => e.tipo === 'pausa_fin');
+
+    for (let i = 0; i < Math.min(inicios.length, fines.length); i++) {
+      const horaInicio = new Date(inicios[i].hora);
+      const horaFin = new Date(fines[i].hora);
+      pares.push({
+        inicio: horaInicio.getHours() * 60 + horaInicio.getMinutes(),
+        fin: horaFin.getHours() * 60 + horaFin.getMinutes(),
+      });
+    }
+  }
+
+  if (pares.length === 0) return [];
+
+  // Ordenar por hora de inicio
+  pares.sort((a, b) => a.inicio - b.inicio);
+
+  // Clustering simple: dividir en 2 grupos
+  const mitad = Math.floor(pares.length / 2);
+  const grupo1 = pares.slice(0, mitad);      // Pausas tempranas (~11:00)
+  const grupo2 = pares.slice(mitad);         // Pausas tardías (~14:00)
+
+  const result: Array<{ inicio: Date; fin: Date }> = [];
+
+  const pausa1 = calcularPromedioGrupo(grupo1, fechaBase);
+  if (pausa1) result.push(pausa1);
+
+  const pausa2 = calcularPromedioGrupo(grupo2, fechaBase);
+  if (pausa2) result.push(pausa2);
+
+  return result;
+}
+
+/**
+ * Calcula el promedio de una única pausa
+ */
+function calcularPromedioPausaUnica(
+  fichajes: Array<{ eventos: FichajeEvento[] }>,
+  fechaBase: Date
+): { inicio: Date; fin: Date } | null {
+  const inicios: number[] = [];
+  const fines: number[] = [];
+
+  for (const f of fichajes) {
+    const pausaInicio = f.eventos.find(e => e.tipo === 'pausa_inicio');
+    const pausaFin = f.eventos.find(e => e.tipo === 'pausa_fin');
+
+    if (pausaInicio && pausaFin) {
+      const horaInicio = new Date(pausaInicio.hora);
+      const horaFin = new Date(pausaFin.hora);
+      inicios.push(horaInicio.getHours() * 60 + horaInicio.getMinutes());
+      fines.push(horaFin.getHours() * 60 + horaFin.getMinutes());
+    }
+  }
+
+  if (inicios.length === 0) return null;
+
+  const promedioInicio = Math.round(
+    inicios.reduce((a, b) => a + b, 0) / inicios.length
+  );
+  const promedioFin = Math.round(
+    fines.reduce((a, b) => a + b, 0) / fines.length
+  );
+
+  return {
+    inicio: crearHoraDesdeMinutos(fechaBase, promedioInicio),
+    fin: crearHoraDesdeMinutos(fechaBase, promedioFin),
+  };
+}
+
+/**
+ * Calcula el promedio de un grupo de pausas
+ */
+function calcularPromedioGrupo(
+  pares: Array<{ inicio: number; fin: number }>,
+  fechaBase: Date
+): { inicio: Date; fin: Date } | null {
+  if (pares.length === 0) return null;
+
+  const promedioInicio = Math.round(
+    pares.reduce((sum, p) => sum + p.inicio, 0) / pares.length
+  );
+  const promedioFin = Math.round(
+    pares.reduce((sum, p) => sum + p.fin, 0) / pares.length
+  );
+
+  return {
+    inicio: crearHoraDesdeMinutos(fechaBase, promedioInicio),
+    fin: crearHoraDesdeMinutos(fechaBase, promedioFin),
+  };
+}
+
+/**
  * Valida que la secuencia de eventos sea coherente
  * @param eventos Eventos promedio a validar
  * @returns true si la secuencia es válida, false si hay conflictos
  */
 export function validarSecuenciaEventos(eventos: PromedioEventos): boolean {
-  const { entrada, pausa_inicio, pausa_fin, salida } = eventos;
+  const { entrada, salida, pausas } = eventos;
 
   // Si no hay entrada ni salida, no es válido
   if (!entrada || !salida) {
@@ -66,22 +210,25 @@ export function validarSecuenciaEventos(eventos: PromedioEventos): boolean {
     return false;
   }
 
-  // Si hay pausas, validar secuencia completa
-  if (pausa_inicio || pausa_fin) {
-    // Si hay inicio de pausa sin fin, o viceversa, no es válido
-    if ((pausa_inicio && !pausa_fin) || (!pausa_inicio && pausa_fin)) {
-      return false;
-    }
+  // Validar todas las pausas
+  if (pausas && pausas.length > 0) {
+    let tiempoAnterior = entrada.getTime();
 
-    if (pausa_inicio && pausa_fin) {
-      // Validar: entrada < pausa_inicio < pausa_fin < salida
-      if (
-        entrada.getTime() >= pausa_inicio.getTime() ||
-        pausa_inicio.getTime() >= pausa_fin.getTime() ||
-        pausa_fin.getTime() >= salida.getTime()
-      ) {
-        return false;
+    for (const pausa of pausas) {
+      // Validar que cada pausa sea coherente
+      if (pausa.inicio.getTime() <= tiempoAnterior) {
+        return false; // La pausa debe empezar después del evento anterior
       }
+
+      if (pausa.inicio.getTime() >= pausa.fin.getTime()) {
+        return false; // La pausa debe terminar después de empezar
+      }
+
+      if (pausa.fin.getTime() >= salida.getTime()) {
+        return false; // La pausa debe terminar antes de la salida
+      }
+
+      tiempoAnterior = pausa.fin.getTime();
     }
   }
 
@@ -90,11 +237,13 @@ export function validarSecuenciaEventos(eventos: PromedioEventos): boolean {
 
 /**
  * Obtiene el promedio de eventos de los últimos N días fichados del empleado
- * Solo considera fichajes finalizados con eventos registrados y de la misma jornada
- * 
+ * Solo considera fichajes finalizados con eventos registrados
+ *
+ * FASE A.2: Últimos 5 fichajes finalizados de CUALQUIER día (sin filtro de día de semana ni jornada)
+ *
  * @param empleadoId ID del empleado
  * @param fecha Fecha del fichaje a cuadrar
- * @param jornadaId ID de la jornada actual del empleado
+ * @param jornadaId ID de la jornada actual del empleado (NO USADO - mantener por compatibilidad)
  * @param limite Número máximo de días históricos a considerar (default: 5)
  * @returns Promedio de eventos o null si no hay suficientes datos
  */
@@ -109,6 +258,7 @@ export async function obtenerPromedioEventosHistoricos(
   // Construir where clause
   // IMPORTANTE: Solo usar fichajes ordinarios para promedios históricos
   // Los extraordinarios son excepcionales y no representan patrones habituales
+  // FASE A.2: NO filtrar por jornadaId ni día de semana - últimos 5 de cualquier día
   const whereClause: Record<string, unknown> = {
     empleadoId,
     tipoFichaje: 'ordinario', // Solo ordinarios para promedios
@@ -116,10 +266,10 @@ export async function obtenerPromedioEventosHistoricos(
     fecha: { lt: fechaBase },
   };
 
-  // Solo filtrar por jornadaId si existe
-  if (jornadaId) {
-    whereClause.jornadaId = jornadaId;
-  }
+  // FASE A.2: ELIMINADO - No filtrar por jornadaId para obtener últimos 5 de cualquier día
+  // if (jornadaId) {
+  //   whereClause.jornadaId = jornadaId;
+  // }
 
   // Buscar últimos fichajes finalizados (traemos más para filtrar por eventos)
   const fichajesHistoricos = await prisma.fichajes.findMany({
@@ -143,10 +293,8 @@ export async function obtenerPromedioEventosHistoricos(
     return null;
   }
 
-  // Extraer horas de cada tipo de evento
+  // Extraer horas de entrada y salida
   const horasEntrada: Date[] = [];
-  const horasPausaInicio: Date[] = [];
-  const horasPausaFin: Date[] = [];
   const horasSalida: Date[] = [];
 
   for (const fichaje of fichajesConEventos) {
@@ -157,12 +305,6 @@ export async function obtenerPromedioEventosHistoricos(
         case 'entrada':
           horasEntrada.push(hora);
           break;
-        case 'pausa_inicio':
-          horasPausaInicio.push(hora);
-          break;
-        case 'pausa_fin':
-          horasPausaFin.push(hora);
-          break;
         case 'salida':
           horasSalida.push(hora);
           break;
@@ -170,12 +312,17 @@ export async function obtenerPromedioEventosHistoricos(
     }
   }
 
-  // Calcular promedios para cada tipo de evento
+  // Detectar pausas (1 o 2 pausas automáticamente)
+  const pausasDetectadas = detectarPausas(fichajesConEventos, fechaBase);
+
+  // Calcular promedios para entrada y salida
   const promedios: PromedioEventos = {
     entrada: calcularPromedioHora(horasEntrada, fechaBase),
-    pausa_inicio: calcularPromedioHora(horasPausaInicio, fechaBase),
-    pausa_fin: calcularPromedioHora(horasPausaFin, fechaBase),
     salida: calcularPromedioHora(horasSalida, fechaBase),
+    pausas: pausasDetectadas,
+    // DEPRECATED: Mantener para compatibilidad (solo primera pausa)
+    pausa_inicio: pausasDetectadas.length > 0 ? pausasDetectadas[0].inicio : null,
+    pausa_fin: pausasDetectadas.length > 0 ? pausasDetectadas[0].fin : null,
   };
 
   // Validar que la secuencia sea coherente
@@ -184,8 +331,7 @@ export async function obtenerPromedioEventosHistoricos(
       `[Fichajes Histórico] Secuencia de eventos inválida para empleado ${empleadoId}:`,
       {
         entrada: promedios.entrada?.toISOString(),
-        pausa_inicio: promedios.pausa_inicio?.toISOString(),
-        pausa_fin: promedios.pausa_fin?.toISOString(),
+        pausas: promedios.pausas?.map(p => `${p.inicio.toISOString()} - ${p.fin.toISOString()}`) || [],
         salida: promedios.salida?.toISOString(),
       }
     );

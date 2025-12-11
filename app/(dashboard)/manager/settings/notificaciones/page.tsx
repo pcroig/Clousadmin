@@ -9,6 +9,8 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { NotificationsClient } from './notifications-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
 
 export default async function NotificationsPage() {
   const session = await getSession();

@@ -31,11 +31,11 @@ async function verificarDocumentosSubidos(
     const empleado = await prisma.empleados.findUnique({
       where: { id: empleadoId },
       select: {
-        carpetas_a_empleados: {
+        carpetas: {
           include: {
-            carpeta: {
+            documento_carpetas: {
               include: {
-                documentos: true,
+                documento: true,
               },
             },
           },
@@ -46,10 +46,10 @@ async function verificarDocumentosSubidos(
     if (!empleado) return false;
 
     // Obtener todos los documentos del empleado
-    const documentosEmpleado = empleado.carpetas_a_empleados.flatMap((ce) =>
-      ce.carpeta.documentos.map((d) => ({
-        ...d,
-        carpetaId: ce.carpetaId,
+    const documentosEmpleado = empleado.carpetas.flatMap((carpeta) =>
+      carpeta.documento_carpetas.map((dc) => ({
+        ...dc.documento,
+        carpetaId: carpeta.id,
       }))
     );
 
@@ -78,23 +78,23 @@ async function verificarFirmasCompletadas(
   documentosFirma: Array<{
     id: string;
     documentoId?: string;
-    plantillaId?: string;
     nombre: string;
-    requiereCompletarAntes: string[];
+    tipo: 'sincrono' | 'asincrono';
+    requiereAccionesAntes: string[];
   }>
 ): Promise<boolean> {
   try {
     // Obtener solicitudes de firma del empleado
     const solicitudesFirma = await prisma.solicitudes_firma.findMany({
       where: {
-        firmantes: {
+        firmas: {
           some: {
             empleadoId,
           },
         },
       },
       include: {
-        firmantes: {
+        firmas: {
           where: {
             empleadoId,
           },
@@ -116,8 +116,8 @@ async function verificarFirmasCompletadas(
       if (!solicitud) return false;
 
       // Verificar que el firmante haya firmado
-      const firmante = solicitud.firmantes[0];
-      return firmante && firmante.firmado;
+      const firma = solicitud.firmas[0];
+      return firma && firma.firmado;
     });
   } catch (error) {
     console.error('[verificarFirmasCompletadas] Error:', error);

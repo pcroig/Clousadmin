@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import { FichajeModal } from '@/components/shared/fichajes/fichaje-modal';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +20,7 @@ import {
 import { useApi } from '@/lib/hooks';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { extraerHoraDeISO } from '@/lib/utils/formatters';
+import { calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
 
 
 interface FichajeEvento {
@@ -79,10 +81,17 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
     return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
   }, [empleadoId, refetchFichajes]);
 
+  /**
+   * Agrupa fichajes por fecha (jornada).
+   *
+   * IMPORTANTE: Esta función asume que TODOS los fichajes pertenecen al MISMO empleado,
+   * ya que el componente filtra por empleadoId en la API (línea 67).
+   * Si se reutiliza en otro contexto con múltiples empleados, modificar para agrupar por empleado+fecha.
+   */
   function agruparPorJornada(fichajes: Fichaje[]): JornadaDia[] {
-    // Agrupar por fecha
+    // Agrupar por fecha (solo válido para un único empleado)
     const grupos: Record<string, Fichaje[]> = {};
-    
+
     fichajes.forEach(f => {
       const fechaKey = new Date(f.fecha).toISOString().split('T')[0];
       if (!grupos[fechaKey]) {
@@ -104,15 +113,24 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
       const horarioEntrada = entrada ? extraerHoraDeISO(entrada.hora) : null;
       const horarioSalida = salida ? extraerHoraDeISO(salida.hora) : null;
 
-      // Calcular horas trabajadas
+      // FIX CRÍTICO: SIEMPRE calcular con progreso en curso para fichajes no finalizados
+      const esFichajeEnCurso = fichajePrincipal.estado === 'en_curso';
       let horasTrabajadas = 0;
-      if (fichajePrincipal.horasTrabajadas) {
-        horasTrabajadas = Number(fichajePrincipal.horasTrabajadas);
-      } else if (entrada && salida) {
-        const entradaHora = new Date(`2000-01-01T${entrada.hora}`);
-        const salidaHora = new Date(`2000-01-01T${salida.hora}`);
-        const diff = (salidaHora.getTime() - entradaHora.getTime()) / (1000 * 60 * 60);
-        horasTrabajadas = diff;
+
+      if (esFichajeEnCurso) {
+        // Fichaje en curso: calcular con tiempo hasta ahora
+        const { horasAcumuladas, horaEnCurso } = calcularProgresoEventos(eventos);
+        horasTrabajadas = horasAcumuladas;
+        if (horaEnCurso) {
+          const ahora = new Date();
+          const horasDesdeUltimoEvento = (ahora.getTime() - horaEnCurso.getTime()) / (1000 * 60 * 60);
+          horasTrabajadas += horasDesdeUltimoEvento;
+        }
+      } else {
+        // Fichaje finalizado: usar valor del backend si existe
+        if (fichajePrincipal.horasTrabajadas) {
+          horasTrabajadas = Number(fichajePrincipal.horasTrabajadas);
+        }
       }
 
       // Balance (asumiendo 8h como jornada estándar)
@@ -136,6 +154,7 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
       finalizado: { label: 'Finalizado', className: 'bg-green-100 text-green-800' },
       revisado: { label: 'Revisado', className: 'bg-gray-100 text-gray-800' },
       pendiente: { label: 'Pendiente', className: 'bg-gray-100 text-gray-800' },
+      rechazado: { label: 'Rechazado', className: 'bg-red-100 text-red-800' },
     };
     const variant = variants[estado] || variants.finalizado;
     return <Badge className={variant.className}>{variant.label}</Badge>;
@@ -229,10 +248,20 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
                 
                 return (
                   <>
-                    <TableRow 
+                    <TableRow
                       key={key}
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => setFichajeEditando(jornada.fichaje)}
+                      className={
+                        jornada.estado === 'rechazado'
+                          ? 'opacity-50 cursor-not-allowed'
+                          : 'cursor-pointer hover:bg-gray-50'
+                      }
+                      onClick={() => {
+                        if (jornada.estado === 'rechazado') {
+                          toast.error('Este fichaje fue rechazado y no se puede editar');
+                          return;
+                        }
+                        setFichajeEditando(jornada.fichaje);
+                      }}
                     >
                       <TableCell>
                         <span className="text-sm font-medium">

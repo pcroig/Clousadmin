@@ -1,14 +1,14 @@
 // ========================================
 // Generación de Pre-nóminas
 // ========================================
-// Servicio reutilizable para crear o vincular pre-nóminas a un evento
+// Servicio para COMPLETAR CÁLCULOS de nóminas base existentes
+// ⚠️ NO CREA NÓMINAS - Las nóminas se crean al crear el evento
 
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 import { prisma } from '@/lib/prisma';
-
-import { generarAlertasParaNomina } from './alertas-nomina';
+import { normalizarFechaSinHora } from '@/lib/utils/fechas';
 
 const SEMANAS_POR_MES = 52 / 12;
 const HORAS_SEMANALES_DEFAULT = 40;
@@ -23,6 +23,7 @@ type EmpleadoParaPrenomina = {
   contratos: Array<{
     id: string;
     salarioBaseAnual: Prisma.Decimal | null;
+    tipoPagas: number;
     fechaInicio: Date;
     fechaFin: Date | null;
   }>;
@@ -42,6 +43,7 @@ type NominaExistente = Prisma.nominasGetPayload<{
     id: true;
     empleadoId: true;
     eventoNominaId: true;
+    salarioBase: true;
     totalComplementos: true;
     totalBruto: true;
     totalNeto: true;
@@ -66,30 +68,35 @@ interface GenerarPrenominasOptions {
 
 export interface GenerarPrenominasResult {
   totalProcesados: number;
-  prenominasCreadas: number;
-  prenominasVinculadas: number;
+  nominasActualizadas: number; // Renombrado de prenominasVinculadas para claridad
   compensacionesAsignadas: number;
   empleadosConComplementos: number;
   complementosConfigurados: number;
 }
 
-interface DatosBaseNomina {
-  salarioMensual: Decimal;
-  salarioBase: Decimal;
-  contratoId: string | null;
-  diasTrabajados: number;
-  diasAusencias: number;
-  complementosPendientes: boolean;
-}
-
+/**
+ * Completa los cálculos finales de nóminas base existentes
+ *
+ * Responsabilidades:
+ * ✅ Calcular totalComplementos (suma de complementos activos)
+ * ✅ Asignar compensaciones de horas extra aprobadas
+ * ✅ Calcular totalBruto final (salarioBase + complementos + compensaciones)
+ * ✅ Actualizar estado a "completada" si no hay pendientes
+ *
+ * NO hace:
+ * ❌ NO crea nóminas (se crean al crear el evento)
+ * ❌ NO calcula salarioBase (ya calculado en nómina base)
+ * ❌ NO calcula días trabajados/ausencias (ya calculados)
+ * ❌ NO genera alertas (ya generadas en nómina base)
+ */
 export async function generarPrenominasEvento(
   options: GenerarPrenominasOptions
 ): Promise<GenerarPrenominasResult> {
   const { eventoId, empresaId, mes, anio } = options;
 
-  const inicioMes = new Date(anio, mes - 1, 1);
-  inicioMes.setHours(0, 0, 0, 0);
-  const finMes = new Date(anio, mes, 0);
+  // Calcular rango del mes (normalizado a UTC para consistencia con BD)
+  const inicioMes = normalizarFechaSinHora(new Date(anio, mes - 1, 1));
+  const finMes = normalizarFechaSinHora(new Date(anio, mes, 0));
   finMes.setHours(23, 59, 59, 999);
 
   const empleadosRaw = await prisma.empleados.findMany({
@@ -101,9 +108,10 @@ export async function generarPrenominasEvento(
       id: true,
       salarioBaseMensual: true,
       salarioBaseAnual: true,
-      jornada: {
+      jornadaId: true,
+      equipos: {
         select: {
-          horasSemanales: true,
+          equipoId: true,
         },
       },
       contratos: {
@@ -127,6 +135,7 @@ export async function generarPrenominasEvento(
         select: {
           id: true,
           salarioBaseAnual: true,
+          tipoPagas: true,
           fechaInicio: true,
           fechaFin: true,
         },
@@ -161,11 +170,23 @@ export async function generarPrenominasEvento(
     },
   });
 
+  // Resolver jornadas efectivas para todos los empleados (optimizado en batch)
+  const { resolverJornadasBatch } = await import('@/lib/jornadas/resolver-batch');
+  const jornadasResueltasBatch = await resolverJornadasBatch(empleadosRaw);
+
+  // Convertir al formato esperado (solo horasSemanales)
+  const jornadasResueltas = new Map<string, { horasSemanales: Prisma.Decimal | null }>();
+  for (const [empleadoId, jornada] of jornadasResueltasBatch.entries()) {
+    jornadasResueltas.set(empleadoId, {
+      horasSemanales: jornada.horasSemanales,
+    });
+  }
+
   const empleados: EmpleadoParaPrenomina[] = empleadosRaw.map((empleado) => ({
     id: empleado.id,
     salarioBaseMensual: empleado.salarioBaseMensual,
     salarioBaseAnual: empleado.salarioBaseAnual,
-    jornada: empleado.jornada,
+    jornada: jornadasResueltas.get(empleado.id) || null,
     contratos: empleado.contratos,
     complementos: empleado.empleado_complementos.map((comp) => ({
       id: comp.id,
@@ -179,7 +200,6 @@ export async function generarPrenominasEvento(
     await prisma.eventos_nomina.update({
       where: { id: eventoId },
       data: {
-        fechaGeneracion: new Date(),
         totalEmpleados: 0,
         empleadosConComplementos: 0,
         complementosAsignados: 0,
@@ -188,8 +208,7 @@ export async function generarPrenominasEvento(
 
     return {
       totalProcesados: 0,
-      prenominasCreadas: 0,
-      prenominasVinculadas: 0,
+      nominasActualizadas: 0,
       compensacionesAsignadas: 0,
       empleadosConComplementos: 0,
       complementosConfigurados: 0,
@@ -209,6 +228,7 @@ export async function generarPrenominasEvento(
         id: true,
         empleadoId: true,
         eventoNominaId: true,
+        salarioBase: true,
         totalComplementos: true,
         totalBruto: true,
         totalNeto: true,
@@ -243,132 +263,76 @@ export async function generarPrenominasEvento(
     compensacionesPorEmpleado.set(compensacion.empleadoId, lista);
   });
 
-  let prenominasCreadas = 0;
-  let prenominasVinculadas = 0;
+  let nominasActualizadas = 0;
   let compensacionesAsignadas = 0;
   let empleadosConComplementos = 0;
   let complementosConfigurados = 0;
 
+  // ✅ NUEVA LÓGICA: Solo actualizar nóminas existentes
   for (const empleado of empleados) {
-    const datosBase = calcularDatosBaseNomina(
-      empleado,
-      inicioMes,
-      finMes
-    );
+    const nominaExistente = nominasPorEmpleado.get(empleado.id);
 
+    // ⚠️ Si no existe nómina base, es un ERROR (deberían haberse creado al crear el evento)
+    if (!nominaExistente) {
+      console.warn(
+        `[generarPrenominasEvento] Nómina no encontrada para empleado ${empleado.id}. ` +
+        `Las nóminas base deberían haberse creado al crear el evento.`
+      );
+      continue;
+    }
+
+    // Contar complementos
     if (empleado.complementos.length > 0) {
       empleadosConComplementos += 1;
       complementosConfigurados += empleado.complementos.length;
     }
 
-    const compensacionesEmpleado =
-      compensacionesPorEmpleado.get(empleado.id) ?? [];
+    // Calcular complementos (suma de importes fijos + variables validados)
+    const totalComplementosCalculados = empleado.complementos.reduce(
+      (sum, comp) => sum.plus(new Decimal(comp.importePersonalizado || 0)),
+      new Decimal(0)
+    );
+
+    // Calcular compensaciones de horas extra
+    const compensacionesEmpleado = compensacionesPorEmpleado.get(empleado.id) ?? [];
     const horasTotalesCompensadas = compensacionesEmpleado.reduce(
       (acc, item) => acc.plus(new Decimal(item.horasBalance)),
       new Decimal(0)
     );
+
+    // Calcular salario mensual para la fórmula de compensación
+    const contratoVigente = empleado.contratos[0];
+    const salarioMensual = calcularSalarioMensual(empleado, contratoVigente);
+
     const importeCompensaciones = calcularImporteCompensacion(
       horasTotalesCompensadas,
-      datosBase.salarioMensual,
+      salarioMensual,
       empleado.jornada?.horasSemanales
     );
 
-    const nominaExistente = nominasPorEmpleado.get(empleado.id);
+    // Calcular totales finales
+    const totalComplementos = totalComplementosCalculados.plus(importeCompensaciones);
+    const salarioBase = new Decimal(nominaExistente.salarioBase); // Ya calculado en nómina base
+    const totalBruto = salarioBase.plus(totalComplementos);
+    const totalNeto = totalBruto; // Simplificado (sin deducciones por ahora)
 
-    if (nominaExistente) {
-      const updateData: Prisma.nominasUpdateInput = {};
-      if (nominaExistente.eventoNominaId !== eventoId) {
-        updateData.eventoNomina = { connect: { id: eventoId } };
-        prenominasVinculadas += 1;
-      }
-
-      if (datosBase.complementosPendientes !== nominaExistente.complementosPendientes) {
-        updateData.complementosPendientes = datosBase.complementosPendientes;
-      }
-
-      if (!horasTotalesCompensadas.isZero()) {
-        const totalComplementosActual = new Decimal(
-          nominaExistente.totalComplementos ?? 0
-        );
-        const totalBrutoActual = new Decimal(nominaExistente.totalBruto ?? 0);
-        const totalNetoActual = new Decimal(nominaExistente.totalNeto ?? 0);
-
-        updateData.totalComplementos = totalComplementosActual.plus(
-          importeCompensaciones
-        );
-        updateData.totalBruto = totalBrutoActual.plus(importeCompensaciones);
-        updateData.totalNeto = totalNetoActual.plus(importeCompensaciones);
-      }
-
-      if (Object.keys(updateData).length > 0) {
-        await prisma.nominas.update({
-          where: { id: nominaExistente.id },
-          data: updateData,
-        });
-      }
-
-      if (compensacionesEmpleado.length > 0) {
-        await asignarCompensacionesANomina(
-          compensacionesEmpleado,
-          nominaExistente.id
-        );
-        compensacionesAsignadas += compensacionesEmpleado.length;
-      }
-
-      continue;
-    }
-
-    const totalComplementos = importeCompensaciones;
-    const totalBruto = datosBase.salarioBase.plus(totalComplementos);
-
-    // Crear la nómina primero en estado pendiente
-    const nuevaNomina = await prisma.nominas.create({
+    // Actualizar nómina con cálculos finales
+    await prisma.nominas.update({
+      where: { id: nominaExistente.id },
       data: {
-        empleadoId: empleado.id,
-        contratoId: datosBase.contratoId,
-        eventoNominaId: eventoId,
-        mes,
-        anio,
-        estado: 'pendiente',
-        salarioBase: datosBase.salarioBase,
         totalComplementos,
-        totalDeducciones: new Decimal(0),
         totalBruto,
-        totalNeto: totalBruto,
-        diasTrabajados: datosBase.diasTrabajados,
-        diasAusencias: datosBase.diasAusencias,
-        complementosPendientes: datosBase.complementosPendientes,
+        totalNeto,
+        estado: 'completada', // Marcar como completada (los cálculos están listos)
       },
     });
 
-    prenominasCreadas += 1;
+    nominasActualizadas += 1;
 
+    // Asignar compensaciones a la nómina
     if (compensacionesEmpleado.length > 0) {
-      await asignarCompensacionesANomina(compensacionesEmpleado, nuevaNomina.id);
+      await asignarCompensacionesANomina(compensacionesEmpleado, nominaExistente.id);
       compensacionesAsignadas += compensacionesEmpleado.length;
-    }
-
-    // Generar alertas para la nómina
-    await generarAlertasParaNomina(nuevaNomina.id, empleado.id, empresaId, mes, anio);
-
-    // Determinar estado final: "completada" si no hay complementos pendientes NI alertas críticas
-    const alertasCriticas = await prisma.alertas_nomina.count({
-      where: {
-        nominaId: nuevaNomina.id,
-        tipo: 'critico',
-        resuelta: false,
-      },
-    });
-
-    const estadoFinal =
-      datosBase.complementosPendientes || alertasCriticas > 0 ? 'pendiente' : 'completada';
-
-    // Actualizar estado si es necesario
-    if (estadoFinal !== 'pendiente') {
-      await prisma.nominas.update({
-        where: { id: nuevaNomina.id },
-        data: { estado: estadoFinal },
-      });
     }
   }
 
@@ -379,8 +343,7 @@ export async function generarPrenominasEvento(
   await prisma.eventos_nomina.update({
     where: { id: eventoId },
     data: {
-      fechaGeneracion: new Date(),
-      totalEmpleados: totalNominasEvento,
+      prenominasGeneradas: totalNominasEvento,
       empleadosConComplementos,
       complementosAsignados: complementosConfigurados,
     },
@@ -388,50 +351,26 @@ export async function generarPrenominasEvento(
 
   return {
     totalProcesados: empleados.length,
-    prenominasCreadas,
-    prenominasVinculadas,
+    nominasActualizadas,
     compensacionesAsignadas,
     empleadosConComplementos,
     complementosConfigurados,
   };
 }
 
-function calcularDatosBaseNomina(
-  empleado: Pick<EmpleadoParaPrenomina, 'contratos' | 'ausencias' | 'complementos' | 'salarioBaseAnual' | 'salarioBaseMensual'>,
-  inicioMes: Date,
-  finMes: Date
-): DatosBaseNomina {
-  const contratoVigente = empleado.contratos[0];
-  const salarioMensual = calcularSalarioMensual(empleado, contratoVigente);
-  const diasMes = finMes.getDate();
-  const diasAusencias = calcularDiasAusencias(empleado.ausencias, inicioMes, finMes);
-  const diasTrabajados = Math.max(0, diasMes - diasAusencias);
-
-  const salarioBase = diasMes > 0
-    ? salarioMensual.mul(diasTrabajados).div(diasMes).toDecimalPlaces(2)
-    : salarioMensual;
-
-  // Un complemento está pendiente si es variable (no fijo) y su importe es 0
-  const complementosPendientes = empleado.complementos.some(
-    (comp) => !comp.esImporteFijo && Number(comp.importePersonalizado) === 0
-  );
-
-  return {
-    salarioMensual,
-    salarioBase,
-    contratoId: contratoVigente?.id ?? null,
-    diasTrabajados,
-    diasAusencias,
-    complementosPendientes,
-  };
-}
+// ========================================
+// FUNCIONES AUXILIARES
+// ========================================
 
 function calcularSalarioMensual(
   empleado: Pick<EmpleadoParaPrenomina, 'salarioBaseMensual' | 'salarioBaseAnual'>,
-  contrato?: { salarioBaseAnual: Prisma.Decimal | null }
+  contrato?: { salarioBaseAnual: Prisma.Decimal | null; tipoPagas: number }
 ): Decimal {
   if (contrato?.salarioBaseAnual) {
-    return new Decimal(contrato.salarioBaseAnual).div(12).toDecimalPlaces(2);
+    const numPagas = contrato.tipoPagas || 12;
+    return new Decimal(contrato.salarioBaseAnual)
+      .div(numPagas)
+      .toDecimalPlaces(2);
   }
 
   if (empleado.salarioBaseMensual) {
@@ -445,17 +384,26 @@ function calcularSalarioMensual(
   return new Decimal(0);
 }
 
+/**
+ * Calcula días de ausencias con normalización de fechas (consistencia timezone)
+ * ⚠️ Esta función ya no se usa en generar-prenominas (días se calculan en crear-nominas-base)
+ * Se mantiene por compatibilidad
+ */
 function calcularDiasAusencias(
   ausencias: Array<{ fechaInicio: Date; fechaFin: Date }>,
   inicioMes: Date,
   finMes: Date
 ): number {
   return ausencias.reduce((total, ausencia) => {
+    // Normalizar fechas para comparación correcta
+    const ausenciaInicio = normalizarFechaSinHora(ausencia.fechaInicio);
+    const ausenciaFin = normalizarFechaSinHora(ausencia.fechaFin);
+
     const inicio = new Date(
-      Math.max(ausencia.fechaInicio.getTime(), inicioMes.getTime())
+      Math.max(ausenciaInicio.getTime(), inicioMes.getTime())
     );
     const fin = new Date(
-      Math.min(ausencia.fechaFin.getTime(), finMes.getTime())
+      Math.min(ausenciaFin.getTime(), finMes.getTime())
     );
 
     if (fin < inicio) {

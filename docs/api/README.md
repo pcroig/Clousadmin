@@ -2,9 +2,9 @@
 
 Bienvenido a la documentación oficial de la API REST de Clousadmin.
 
-> **Versión actual:** 1.0.0  
-> **Última actualización:** 27 de enero de 2025  
-> **Base URL:** `https://api.clousadmin.com`  
+> **Versión actual:** 1.0.0
+> **Última actualización:** 10 de diciembre de 2025
+> **Base URL:** `https://api.clousadmin.com`
 > **Autenticación:** JWT Bearer Token
 
 > **Nota**: Para detalles de refactorización de APIs (2025-01-27), ver [`API_REFACTORING.md`](../API_REFACTORING.md)
@@ -67,18 +67,18 @@ curl -X GET https://api.clousadmin.com/api/empleados \
 
 ### Referencia de API
 
-Documentación detallada por módulo con ejemplos:
+Documentación de endpoints por módulo. Para detalles de funcionalidad y lógica de negocio, ver [`/docs/funcionalidades`](../funcionalidades/).
 
-| Módulo | Endpoints | Descripción |
-|--------|-----------|-------------|
-| [Autenticación](./reference/auth.md) | 6 | Login, OAuth, recuperación de contraseña |
-| [Empleados](./reference/empleados.md) | 15 | Gestión completa del ciclo de vida de empleados |
-| [Ausencias](./reference/ausencias.md) | 6+ | Solicitud, aprobación y gestión de ausencias |
-| [Fichajes](./reference/fichajes.md) | 13+ | Control horario y balance de horas |
-| [Nóminas](./reference/nominas.md) | 24+ | Gestión y descarga de nóminas |
-| [Equipos](./reference/equipos.md) | 5 | Gestión de equipos y asignación de managers |
-| [Documentos](./reference/documentos.md) | 10+ | Gestión documental y plantillas |
-| [Webhooks](./reference/webhooks.md) | 2 | Stripe y Google Calendar |
+| Módulo | Endpoints | Descripción | Funcionalidad |
+|--------|-----------|-------------|---------------|
+| [Autenticación](./reference/auth.md) | 6 | Login, OAuth, recuperación de contraseña | [Ver funcionalidad](../funcionalidades/autenticacion.md) |
+| [Empleados](./reference/empleados.md) | 13+ | Endpoints de empleados | [Ver funcionalidad](../funcionalidades/empleados.md) |
+| [Equipos](./reference/equipos.md) | 11 | Endpoints de equipos | [Ver funcionalidad](../funcionalidades/equipos.md) |
+| [Ausencias](./reference/ausencias.md) | 6+ | Endpoints de ausencias | [Ver funcionalidad](../funcionalidades/ausencias.md) |
+| [Fichajes](./reference/fichajes.md) | 13+ | Endpoints de fichajes | [Ver funcionalidad](../funcionalidades/fichajes.md) |
+| [Nóminas](./reference/nominas.md) | 24+ | Endpoints de nóminas | [Ver funcionalidad](../funcionalidades/gestion-nominas.md) |
+| [Documentos](./reference/documentos.md) | 10+ | Endpoints de documentos | [Ver funcionalidad](../funcionalidades/documentos.md) |
+| [Webhooks](./reference/webhooks.md) | 2 | Stripe y Google Calendar | - |
 
 ### Recursos Adicionales
 
@@ -138,7 +138,7 @@ Gestión completa del ciclo de vida de empleados desde onboarding hasta offboard
 - `PATCH /api/empleados/{id}` - Actualizar datos
 - `DELETE /api/empleados/{id}` - Dar de baja
 
-[Ver documentación completa →](./reference/empleados.md)
+[Ver referencia API →](./reference/empleados.md) | [Ver funcionalidad →](../funcionalidades/empleados.md)
 
 ---
 
@@ -148,9 +148,9 @@ Organización de empleados en equipos con managers asignados.
 **Endpoints principales:**
 - `GET /api/equipos` - Listar equipos
 - `POST /api/equipos` - Crear equipo
-- `POST /api/equipos/{id}/miembros` - Añadir miembros
+- `POST /api/equipos/{id}/members` - Añadir miembros
 
-[Ver documentación completa →](./reference/equipos.md)
+[Ver referencia API →](./reference/equipos.md) | [Ver funcionalidad →](../funcionalidades/equipos.md)
 
 ---
 
@@ -531,5 +531,12 @@ Esta API es propietaria de Clousadmin. El uso de esta API está sujeto a los té
 
 ---
 
-**Última actualización:** 27 de enero de 2025
+**Última actualización:** 10 de diciembre de 2025
 **Versión de documentación:** 1.0.0
+
+---
+
+## Organización de la Documentación
+
+- **`/docs/api/reference/`** - Referencia técnica de endpoints (requests, responses, parámetros)
+- **`/docs/funcionalidades/`** - Lógica de negocio, workflows, validaciones y casos de uso

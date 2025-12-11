@@ -9,6 +9,9 @@ import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { CAMPANAS_VACACIONES_ENABLED } from '@/lib/constants/feature-flags';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function ManagerAusenciasPage() {
   const session = await getSession();
 

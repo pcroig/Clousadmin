@@ -111,14 +111,81 @@ export async function PATCH(
     );
 
     if (accion === 'rechazar') {
-      // NUEVO: Verificar si es corrección optimista y revocar eventos editados
+      // Verificar si es edición de empleado u otra corrección optimista
       const detalles = solicitud.detalles as {
         eventos?: Array<{id?: string, tipo: string, hora: string, editado: boolean}>;
         eventoSalidaId?: string;
         origen?: string;
       };
 
-      // Verificar si es corrección optimista (cualquiera de los 3 casos)
+      // Verificar si es edición de empleado (CONGELAR, no revertir)
+      const esEdicionEmpleado =
+        detalles.origen === 'edicion_empleado' ||
+        detalles.origen === 'completar_descanso';
+
+      if (esEdicionEmpleado) {
+        // EMPLEADO → HR rechaza: CONGELAR (no revertir)
+        await prisma.$transaction(async (tx) => {
+          // 1. Marcar fichaje como rechazado (congelado)
+          await tx.fichajes.update({
+            where: { id: solicitud.fichajeId },
+            data: { estado: 'rechazado' }
+          });
+
+          // 2. Marcar solicitud como rechazada (OPTIMISTIC LOCKING)
+          const updated = await tx.solicitudes_correccion_fichaje.updateMany({
+            where: {
+              id: solicitud.id,
+              estado: EstadoSolicitudCorreccionFichaje.pendiente // Solo si aún está pendiente
+            },
+            data: {
+              estado: EstadoSolicitudCorreccionFichaje.rechazada,
+              respuesta: motivoRespuesta ?? 'Edición rechazada por HR Admin',
+              revisadaPor: session.user.empleadoId,
+              revisadaEn: new Date(),
+            }
+          });
+
+          // Verificar que se actualizó (no fue modificada por CRON)
+          if (updated.count === 0) {
+            throw new Error('La solicitud ya fue procesada por otro proceso');
+          }
+
+          // 3. Actualizar auto_completado si existe
+          await tx.auto_completados.updateMany({
+            where: {
+              datosOriginales: {
+                path: ['solicitudId'],
+                equals: solicitud.id
+              }
+            },
+            data: {
+              estado: 'rechazado',
+              aprobadoEn: new Date(),
+              aprobadoPor: session.user.empleadoId
+            }
+          });
+        });
+
+        // 4. Notificar empleado del rechazo y congelación
+        await crearNotificacionSolicitudRechazada(
+          prisma,
+          {
+            solicitudId: solicitud.id,
+            empresaId: solicitud.empresaId,
+            empleadoId: solicitud.empleadoId,
+            tipo: 'fichaje_correccion',
+            motivoRechazo: `${motivoRespuesta || 'Edición rechazada'}. El fichaje queda marcado como rechazado y no se puede modificar.`,
+          },
+          { actorUsuarioId: session.user.id }
+        );
+
+        return successResponse({
+          mensaje: 'Solicitud rechazada. Fichaje marcado como rechazado.'
+        });
+      }
+
+      // Flujo normal: Otros orígenes optimistas (REVERTIR cambios)
       if (esOrigenOptimista(detalles.origen)) {
         // Revocación optimista: eliminar eventos editados en una transacción
         await prisma.$transaction(async (tx) => {
@@ -176,9 +243,12 @@ export async function PATCH(
             }
           });
 
-          // 7. Rechazar solicitud
-          await tx.solicitudes_correccion_fichaje.update({
-            where: { id: solicitud.id },
+          // 7. Rechazar solicitud (OPTIMISTIC LOCKING)
+          const updated = await tx.solicitudes_correccion_fichaje.updateMany({
+            where: {
+              id: solicitud.id,
+              estado: EstadoSolicitudCorreccionFichaje.pendiente // Solo si aún está pendiente
+            },
             data: {
               estado: EstadoSolicitudCorreccionFichaje.rechazada,
               respuesta: motivoRespuesta ?? null,
@@ -186,6 +256,11 @@ export async function PATCH(
               revisadaEn: new Date(),
             }
           });
+
+          // Verificar que se actualizó (no fue modificada por CRON)
+          if (updated.count === 0) {
+            throw new Error('La solicitud ya fue procesada por otro proceso');
+          }
         });
 
         // 8. Notificar al empleado del rechazo y revocación
@@ -240,8 +315,12 @@ export async function PATCH(
       usuarioId: session.user.id,
     });
 
-    const actualizada = await prisma.solicitudes_correccion_fichaje.update({
-      where: { id: solicitud.id },
+    // OPTIMISTIC LOCKING: Solo actualizar si aún está pendiente
+    const updateResult = await prisma.solicitudes_correccion_fichaje.updateMany({
+      where: {
+        id: solicitud.id,
+        estado: EstadoSolicitudCorreccionFichaje.pendiente // Solo si aún está pendiente
+      },
       data: {
         estado: EstadoSolicitudCorreccionFichaje.aprobada,
         respuesta: motivoRespuesta ?? null,
@@ -249,6 +328,25 @@ export async function PATCH(
         revisadaEn: new Date(),
       },
     });
+
+    if (updateResult.count === 0) {
+      return forbiddenResponse('La solicitud ya fue procesada por otro proceso');
+    }
+
+    // Obtener solicitud actualizada para notificación
+    const actualizada = await prisma.solicitudes_correccion_fichaje.findUnique({
+      where: { id: solicitud.id },
+      include: {
+        empleados_solicitudes_correccion_fichaje_empleadoIdToempleados: {
+          select: { nombre: true, apellidos: true }
+        },
+        fichaje: { select: { fecha: true } }
+      }
+    });
+
+    if (!actualizada) {
+      return notFoundResponse('Error al obtener solicitud actualizada');
+    }
 
     const empleadoSolicitud =
       solicitud.empleados_solicitudes_correccion_fichaje_empleadoIdToempleados;

@@ -63,25 +63,45 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 
 ---
 
-### Paso 1: Importar Empleados
+### Paso 1: Añadir Empleados
 
-**Objetivo:** Importar empleados masivamente desde Excel.
+**Objetivo:** Añadir empleados a la empresa mediante 3 métodos diferentes.
 
-**Componente:** `components/shared/importar-empleados-excel.tsx`
+**Componente:** `components/onboarding/add-empleados-onboarding.tsx`
 
-**Funcionalidad:**
-- Subida de archivo Excel (.xlsx, .xls, .csv)
-- Procesamiento con IA para detectar estructura automáticamente
-- **Importación directa sin paso de confirmación** (simplificado en v2.2)
-- Validación de datos
-- Creación automática de equipos y puestos detectados
-- Opción de enviar invitaciones por email
-- **Persistencia:** Al volver a este paso, se cargan automáticamente empleados sin onboarding completado
+**Métodos disponibles:**
 
-**Mejoras en v2.2:**
-- ❌ Eliminado paso intermedio "Confirmar e importar X empleados"
-- ✅ Botón cambiado de "Guardar y volver" a "Guardar"
-- ✅ Banner solo muestra empleados del equipo (no cuenta al HR admin)
+1. **Añadir Manual** (opción recomendada)
+   - Formulario completo con todos los campos del empleado
+   - Campos: datos básicos, personales, dirección, bancarios, laborales
+   - Creación de equipos y puestos inline
+   - Validación en tiempo real
+   - Componente: `components/organizacion/add-persona-manual-form.tsx`
+
+2. **Desde Documento** (extracción con IA)
+   - Subida de contrato o DNI (PDF, JPG, PNG)
+   - Extracción automática de datos con IA
+   - Preview y confirmación antes de crear
+   - Componente: `components/documentos/subir-documento-individual.tsx`
+
+3. **Desde Excel** (importación masiva)
+   - Subida de archivo Excel (.xlsx, .xls, .csv)
+   - Procesamiento con IA para detectar estructura automáticamente
+   - **Importación directa sin paso de confirmación** (simplificado en v2.2)
+   - Validación de datos
+   - Creación automática de equipos y puestos detectados
+   - Componente: `components/shared/importar-empleados-excel.tsx`
+
+**UI del paso:**
+- Pantalla inicial con 3 opciones visuales (cards)
+- Navegación fluida con botón "← Volver a opciones"
+- La opción "Añadir Manual" está destacada como recomendada
+- Banner de progreso: muestra empleados del equipo añadidos (no cuenta al HR admin)
+
+**Mejoras en v2.3 (Dic 2025):**
+- ✅ **Nuevo componente unificado** con 3 opciones de añadir empleados
+- ✅ **Opción manual destacada** como método recomendado
+- ✅ **Botón redundante eliminado** en importación Excel
 - ✅ Banner solo aparece con 2+ empleados totales (admin + al menos 1 del equipo)
 
 **Persistencia de Datos:**
@@ -322,7 +342,7 @@ const guardar = async (): Promise<boolean> => {
 - Controla la navegación entre pasos
 
 **Componentes de Pasos:**
-- `components/onboarding/importar-empleados.tsx`
+- `components/onboarding/add-empleados-onboarding.tsx` (nuevo en v2.3)
 - `components/onboarding/sedes-form.tsx`
 - `components/onboarding/jornada-step.tsx`
 - `components/onboarding/calendario-step.tsx`
@@ -459,8 +479,16 @@ El stepper muestra:
 
 ---
 
-**Última actualización:** 2025-12-09
+**Última actualización:** 2025-12-10
 **Autor:** Clousadmin Dev Team
+
+**Cambios en v2.3 (10 Dic 2025):**
+- ✅ **Paso 1 rediseñado**: Nuevo componente `AddEmpleadosOnboarding` con 3 opciones
+- ✅ **Opción manual destacada**: Añadir empleado manual como método recomendado
+- ✅ **3 métodos de añadir**: Manual, desde documento (IA), desde Excel (masivo)
+- ✅ **UI mejorada**: Pantalla de selección con cards visuales
+- ✅ **Botón redundante eliminado**: Solo "Guardar y volver" en importación Excel
+- ✅ **Navegación fluida**: Botón "← Volver a opciones" en cada método
 
 **Cambios en v2.2 (9 Dic 2025):**
 - ✅ **Paso 1 simplificado**: Eliminado paso de confirmación intermedio en importación de empleados

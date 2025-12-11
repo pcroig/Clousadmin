@@ -132,6 +132,7 @@ export async function POST(
           activo: false,
           fechaBaja: fechaFin,
           estadoEmpleado: 'baja',
+          jornadaId: null, // Limpiar jornada al desactivar
         },
       });
 

@@ -134,7 +134,9 @@ export function FirmarConSeleccionCarpeta({
         onOpenChange={(open) => {
           if (!open) handleCancelarCarpeta();
         }}
-        carpetasCentralizadas={infoCarpeta?.carpetasCentralizadas || []}
+        carpetasCentralizadas={
+          infoCarpeta?.necesitaSeleccion ? infoCarpeta.carpetasCentralizadas : []
+        }
         onConfirm={handleConfirmarCarpeta}
         isLoading={loadingCarpeta}
       />

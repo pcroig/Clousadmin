@@ -1,6 +1,7 @@
 // ========================================
 // API: Cuadrar Fichajes Masivamente
 // ========================================
+// GET: Obtener fichajes pendientes con eventos propuestos
 // POST: Cuadrar fichajes pendientes creando eventos según jornada
 
 import { NextRequest } from 'next/server';
@@ -11,15 +12,13 @@ import {
   badRequestResponse,
   handleApiError,
   isNextResponse,
-  requireAuthAsHR,
+  requireAuthAndRole,
   successResponse,
   validateRequest
 } from '@/lib/api-handler';
 import {
   calcularHorasTrabajadas,
   calcularTiempoEnPausa,
-  cerrarFichajeAutomaticamente,
-  debeCerrarseAutomaticamente,
 } from '@/lib/calculos/fichajes';
 import { calcularHorasEsperadasDelDia } from '@/lib/calculos/fichajes-helpers';
 import {
@@ -43,11 +42,213 @@ const cuadrarSchema = z.object({
 
 const MAX_FICHAJES_POR_REQUEST = 50;
 
-// POST /api/fichajes/cuadrar - Cuadrar fichajes masivamente (solo HR Admin)
+// ========================================
+// GET /api/fichajes/cuadrar
+// ========================================
+// Obtiene fichajes pendientes con eventos propuestos pre-calculados
+// Query params opcionales:
+// - fecha: YYYY-MM-DD (filtrar por fecha específica)
+// - empleadoId: string (filtrar por empleado)
+// - limit: number (default: 100, max: 500)
+// - offset: number (default: 0)
+export async function GET(request: NextRequest) {
+  try {
+    // Verificar autenticación y rol HR Admin o Platform Admin
+    const authResult = await requireAuthAndRole(request, ['hr_admin', 'platform_admin']);
+    if (isNextResponse(authResult)) return authResult;
+    const { session } = authResult;
+
+    // Parsear query params
+    const { searchParams } = new URL(request.url);
+    const fecha = searchParams.get('fecha');
+    const fechaInicio = searchParams.get('fechaInicio');
+    const fechaFin = searchParams.get('fechaFin');
+    const empleadoId = searchParams.get('empleadoId');
+    const equipoId = searchParams.get('equipoId');
+    const search = searchParams.get('search');
+    const limit = Math.min(Number(searchParams.get('limit')) || 100, 500);
+    const offset = Number(searchParams.get('offset')) || 0;
+
+    // Construir where clause base
+    const where: Record<string, unknown> = {
+      empresaId: session.user.empresaId,
+      estado: 'pendiente',
+      tipoFichaje: 'ordinario',
+    };
+
+    // Filtro de fecha (única o rango)
+    // CRÍTICO: Usar normalizarFechaSinHora para evitar desfases de timezone
+    if (fecha) {
+      where.fecha = normalizarFechaSinHora(new Date(fecha));
+    } else if (fechaInicio || fechaFin) {
+      const fechaWhere: Record<string, Date> = {};
+      if (fechaInicio) {
+        fechaWhere.gte = normalizarFechaSinHora(new Date(fechaInicio));
+      }
+      if (fechaFin) {
+        fechaWhere.lte = normalizarFechaSinHora(new Date(fechaFin));
+      }
+      where.fecha = fechaWhere;
+    }
+
+    // Filtro de empleado
+    if (empleadoId) {
+      where.empleadoId = empleadoId;
+    }
+
+    // Construir filtro de empleado acumulativamente para evitar sobreescritura
+    const empleadoWhere: Record<string, unknown> = {};
+
+    // Filtro de búsqueda por nombre
+    if (search) {
+      empleadoWhere.OR = [
+        { nombre: { contains: search, mode: 'insensitive' } },
+        { apellidos: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Filtro de equipo
+    if (equipoId && equipoId !== 'todos') {
+      empleadoWhere.equipos = {
+        some: {
+          equipoId,
+        },
+      };
+    }
+
+    // Aplicar filtro de empleado si hay alguno
+    if (Object.keys(empleadoWhere).length > 0) {
+      where.empleado = empleadoWhere;
+    }
+
+    // Obtener fichajes pendientes con eventos propuestos
+    const fichajes = await prisma.fichajes.findMany({
+      where,
+      include: {
+        empleado: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            email: true,
+            equipos: {
+              select: {
+                equipo: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                  },
+                },
+              },
+              take: 1,
+            },
+          },
+        },
+        eventos: {
+          orderBy: { hora: 'asc' },
+          select: {
+            id: true,
+            tipo: true,
+            hora: true,
+            editado: true,
+            motivoEdicion: true,
+          },
+        },
+        eventos_propuestos: {
+          orderBy: { hora: 'asc' },
+          select: {
+            id: true,
+            tipo: true,
+            hora: true,
+            metodo: true,
+          },
+        },
+      },
+      orderBy: [
+        { fecha: 'desc' },
+        { empleado: { apellidos: 'asc' } },
+      ],
+      skip: offset,
+      take: limit,
+    });
+
+    // Contar total para paginación
+    const total = await prisma.fichajes.count({ where });
+
+    // Obtener jornadas de los fichajes (necesarias para frontend)
+    const jornadaIds = Array.from(new Set(fichajes.map(f => f.jornadaId).filter(Boolean) as string[]));
+    const jornadas = await prisma.jornadas.findMany({
+      where: { id: { in: jornadaIds } },
+      select: {
+        id: true,
+        config: true,
+        horasSemanales: true,
+      },
+    });
+    const jornadasMap = new Map(jornadas.map(j => [j.id, j]));
+
+    // Formatear respuesta para compatibilidad con frontend
+    const fichajesFormateados = fichajes.map((fichaje) => {
+      // Formatear eventos registrados
+      const eventosRegistrados = fichaje.eventos.map(e => ({
+        tipo: e.tipo,
+        hora: e.hora.toISOString(),
+        origen: 'registrado' as const,
+      }));
+
+      // Formatear eventos propuestos
+      const eventosPropuestos = fichaje.eventos_propuestos.map(e => ({
+        tipo: e.tipo,
+        hora: e.hora.toISOString(),
+        origen: 'propuesto' as const,
+      }));
+
+      // Calcular eventos faltantes (eventos propuestos que no están registrados)
+      const tiposRegistrados = eventosRegistrados.map(e => e.tipo);
+      const eventosFaltantes = eventosPropuestos
+        .filter(ep => !tiposRegistrados.includes(ep.tipo))
+        .map(ep => ep.tipo);
+
+      // Extraer equipo del empleado
+      const equipoInfo = fichaje.empleado.equipos?.[0]?.equipo ?? null;
+
+      return {
+        id: fichaje.id,
+        fichajeId: fichaje.id,
+        empleadoId: fichaje.empleado.id,
+        empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
+        equipoId: equipoInfo?.id ?? null,
+        equipoNombre: equipoInfo?.nombre ?? null,
+        fecha: fichaje.fecha.toISOString().split('T')[0],
+        eventosRegistrados,
+        eventosPropuestos,
+        razon: eventosRegistrados.length > 0 ? 'Fichaje incompleto' : '',
+        eventosFaltantes,
+        tieneEventosRegistrados: eventosRegistrados.length > 0,
+        ausenciaMedioDia: null, // TODO: Verificar ausencias si se necesita
+      };
+    });
+
+    return successResponse({
+      fichajes: fichajesFormateados,
+      total,
+      limit,
+      offset,
+      hasMore: offset + fichajes.length < total,
+    });
+  } catch (error) {
+    return handleApiError(error, 'API GET /api/fichajes/cuadrar');
+  }
+}
+
+// ========================================
+// POST /api/fichajes/cuadrar
+// ========================================
+// Cuadrar fichajes masivamente (solo HR Admin)
 export async function POST(request: NextRequest) {
   try {
-    // Verificar autenticación y rol HR Admin
-    const authResult = await requireAuthAsHR(request);
+    // Verificar autenticación y rol HR Admin o Platform Admin
+    const authResult = await requireAuthAndRole(request, ['hr_admin', 'platform_admin']);
     if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
@@ -100,18 +301,9 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        await prisma.fichajes.update({
+        // FASE A.5: Eliminar fichaje en vez de marcar como finalizado
+        await prisma.fichajes.delete({
           where: { id: fichaje.id },
-          data: {
-            estado: 'finalizado',
-            horasTrabajadas: 0,
-            horasEnPausa: 0,
-            autoCompletado: false,
-            cuadradoMasivamente: true,
-            cuadradoPor: session.user.id,
-            cuadradoEn: new Date(),
-            fechaAprobacion: new Date(),
-          },
         });
         cuadrados++;
       }
@@ -134,8 +326,15 @@ export async function POST(request: NextRequest) {
       },
       include: {
         empleado: {
-          include: {
-            jornada: true,
+          select: {
+            id: true,
+            empresaId: true,
+            jornadaId: true,
+            equipos: {
+              select: {
+                equipoId: true,
+              },
+            },
           },
         },
         eventos: {
@@ -168,7 +367,26 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2. Extraer IDs y Fechas para buscar ausencias en batch
+    // 2. Resolver jornadas efectivas para todos los fichajes (optimizado en batch)
+    const { resolverJornadasBatch } = await import('@/lib/jornadas/resolver-batch');
+
+    // Extraer empleados únicos de los fichajes
+    const empleadosUnicos = Array.from(
+      new Map(fichajes.map(f => [f.empleado.id, f.empleado])).values()
+    );
+
+    const jornadasResueltasBatch = await resolverJornadasBatch(empleadosUnicos);
+
+    // Convertir al formato esperado por el resto del código
+    const jornadasResueltas = new Map<string, { jornadaId: string | null; jornada: any }>();
+    for (const [empleadoId, jornada] of jornadasResueltasBatch.entries()) {
+      jornadasResueltas.set(empleadoId, {
+        jornadaId: jornada.id,
+        jornada,
+      });
+    }
+
+    // 2b. Extraer IDs y Fechas para buscar ausencias en batch
     const empleadoIds = Array.from(new Set(fichajes.map((f) => f.empleadoId)));
     // Calcular rango de fechas para optimizar query de ausencias
     const fechas = fichajes.map((f) => f.fecha);
@@ -178,14 +396,16 @@ export async function POST(request: NextRequest) {
     maxFecha.setHours(23, 59, 59, 999);
     minFecha.setHours(0, 0, 0, 0);
 
-    // 3. Cargar ausencias de medio día relevantes en el rango
+    // 2c. Cargar ausencias de medio día relevantes en el rango
     // Solo nos importan las ausencias CONFIRMADAS o COMPLETADAS y de MEDIO DIA
+    // IMPORTANTE: Las ausencias medio día tienen medioDia=true Y periodo='manana'|'tarde'
     const ausenciasMedioDia = await prisma.ausencias.findMany({
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },
-        medioDia: true, // Solo medio día afecta al horario intra-día
-        estado: { in: ['confirmada', 'completada'] }, // Usando strings directos para evitar import circular si enum falla
+        medioDia: true, // Flag de medio día
+        periodo: { in: ['manana', 'tarde'] }, // Periodo específico (no null = día completo)
+        estado: { in: ['confirmada', 'completada'] }, // Solo ausencias aprobadas
         // Solapamiento con el rango de fechas de los fichajes
         fechaInicio: { lte: maxFecha },
         fechaFin: { gte: minFecha },
@@ -204,7 +424,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Procesar cada fichaje en memoria
+    // 3. Procesar cada fichaje en memoria
     // Usamos una transacción o promesas paralelas controladas si el volumen es muy alto.
     // Para simplificar y evitar deadlocks masivos, procesamos secuencialmente pero con datos ya en memoria.
     // Solo escribiremos (writes) dentro del loop.
@@ -214,38 +434,37 @@ export async function POST(request: NextRequest) {
     // NOTA: Para batches muy grandes, Prisma recomienda transactions pequeñas.
     // Aquí procesamos todo en una sola transacción para garantizar integridad total.
 
+    // Calcular timeout dinámico: 500ms por fichaje, mínimo 20s, máximo 60s
+    const timeoutMs = Math.min(Math.max(fichajeIds.length * 500, 20000), 60000);
+    console.log(`[API Cuadrar] Procesando ${fichajeIds.length} fichajes con timeout de ${timeoutMs}ms`);
+
     await prisma.$transaction(async (tx) => {
       for (const fichaje of fichajes) {
         const fichajeId = fichaje.id;
         try {
-          // PASO 0: Verificar si el fichaje debe cerrarse automáticamente ANTES de cuadrar
-          // (Ej: fichaje en_curso de ayer o que pasó el limiteSuperior)
-          if (fichaje.estado === 'en_curso') {
-            const debeCerrarse = debeCerrarseAutomaticamente(fichaje);
-            if (debeCerrarse) {
-              console.log(`[API Cuadrar] Fichaje ${fichajeId} debe cerrarse automáticamente antes de cuadrar`);
-              await cerrarFichajeAutomaticamente(fichajeId, tx);
-              // Continuar con el cuadrado normal (el fichaje ahora está en pendiente o finalizado)
-            }
-          }
-
-          // Re-fetch dentro de la transacción para lock/concurrencia (optimista)
-          // O confiar en la carga previa si el riesgo es bajo.
-          // Para seguridad máxima en "cuadrar", verificamos estado una vez más.
+          // Verificar estado del fichaje
           const fichajeActual = await tx.fichajes.findUnique({
              where: { id: fichajeId },
              select: { estado: true }
           });
 
-          if (!fichajeActual || (fichajeActual.estado !== 'pendiente' && fichajeActual.estado !== 'en_curso')) {
-             // Si cambió de estado desde la carga inicial, lo saltamos silenciosamente o logueamos
-             console.warn(`[API Cuadrar] Fichaje ${fichajeId} cambió de estado o no existe, saltando.`);
-             errores.push(`Fichaje ${fichajeId}: Ya procesado o estado inválido`);
+          // Bloquear fichajes rechazados
+          if (fichajeActual?.estado === 'rechazado') {
+             console.warn(`[API Cuadrar] Fichaje ${fichajeId} está rechazado (congelado), saltando.`);
+             errores.push(`Fichaje ${fichajeId}: Fichaje rechazado por discrepancia, no se puede cuadrar`);
              continue;
           }
 
-          // Validaciones básicas en memoria
-          if (!fichaje.empleado.jornada) {
+          // Solo procesar fichajes pendientes (el CRON ya cerró los en_curso)
+          if (!fichajeActual || fichajeActual.estado !== 'pendiente') {
+             console.warn(`[API Cuadrar] Fichaje ${fichajeId} no está en estado pendiente, saltando.`);
+             errores.push(`Fichaje ${fichajeId}: Debe estar en estado pendiente`);
+             continue;
+          }
+
+          // Validaciones básicas en memoria - Obtener jornada resuelta
+          const jornadaResuelta = jornadasResueltas.get(fichaje.empleado.id);
+          if (!jornadaResuelta || !jornadaResuelta.jornada) {
             errores.push(`Fichaje ${fichajeId}: Empleado sin jornada asignada`);
             continue;
           }
@@ -253,18 +472,23 @@ export async function POST(request: NextRequest) {
           // Recuperar ausencia del mapa
           const fechaKey = `${fichaje.empleadoId}_${format(toMadridDate(fichaje.fecha), 'yyyy-MM-dd')}`;
           const ausenciaMatch = mapaAusencias.get(fechaKey);
-          
+
           // Simular objeto AusenciaMedioDia
           // Casteamos el tipo Ausencia para evitar conflictos con includes opcionales
           const ausenciaMedioDiaInfo = {
             tieneAusencia: !!ausenciaMatch && (ausenciaMatch.periodo === 'manana' || ausenciaMatch.periodo === 'tarde'),
             medioDia: (ausenciaMatch?.periodo === 'manana' || ausenciaMatch?.periodo === 'tarde')
               ? (ausenciaMatch.periodo as 'manana' | 'tarde')
-              : null, 
+              : null,
             ausencia: ausenciaMatch as unknown as Record<string, unknown> | null,
           };
 
-          const jornada = fichaje.empleado.jornada;
+          // VALIDACIÓN FASE 6.1: Advertir sobre ausencias medio día
+          if (ausenciaMedioDiaInfo.tieneAusencia) {
+            console.warn(`[API Cuadrar] Fichaje ${fichajeId} tiene ausencia medio día (${ausenciaMedioDiaInfo.medioDia}) - requiere revisión manual de horarios`);
+          }
+
+          const jornada = jornadaResuelta.jornada;
           const config = jornada.config as JornadaConfig;
           const nombreDia = obtenerNombreDia(fichaje.fecha);
           const configDia = config[nombreDia] as DiaConfig | undefined;
@@ -277,19 +501,25 @@ export async function POST(request: NextRequest) {
              if (!configDia || configDia.activo === false) {
                // Día no laborable
              } else {
-               if (!ausenciaMedioDiaInfo.tieneAusencia || ausenciaMedioDiaInfo.medioDia === 'tarde') eventosRequeridos.push('entrada');
-               if (!ausenciaMedioDiaInfo.tieneAusencia || ausenciaMedioDiaInfo.medioDia === 'manana') eventosRequeridos.push('salida');
+               // CORRECCIÓN: Ausencia medio día SÍ requiere entrada y salida
+               eventosRequeridos.push('entrada');
+               eventosRequeridos.push('salida');
+
+               // CORRECCIÓN: Ausencia medio día NO requiere descanso
                if (configDia.pausa_inicio && configDia.pausa_fin && !ausenciaMedioDiaInfo.tieneAusencia) {
                  eventosRequeridos.push('pausa_inicio');
                  eventosRequeridos.push('pausa_fin');
                }
              }
-          } 
+          }
           // -- JORNADA FLEXIBLE --
           else if (config.tipo === 'flexible') {
             if (configDia && configDia.activo !== false) {
-               if (!ausenciaMedioDiaInfo.tieneAusencia || ausenciaMedioDiaInfo.medioDia === 'tarde') eventosRequeridos.push('entrada');
-               if (!ausenciaMedioDiaInfo.tieneAusencia || ausenciaMedioDiaInfo.medioDia === 'manana') eventosRequeridos.push('salida');
+               // CORRECCIÓN: Ausencia medio día SÍ requiere entrada y salida
+               eventosRequeridos.push('entrada');
+               eventosRequeridos.push('salida');
+
+               // CORRECCIÓN: Ausencia medio día NO requiere descanso
                if (config.descansoMinimo && !ausenciaMedioDiaInfo.tieneAusencia) {
                   // En flexible con descanso mínimo forzamos pausas para cuadrar horas exactas si faltan
                   eventosRequeridos.push('pausa_inicio');
@@ -297,8 +527,8 @@ export async function POST(request: NextRequest) {
                }
             } else if (configDia === undefined) {
                // Fallback: si no hay configuración del día, asumir día laborable básico
-               if (!ausenciaMedioDiaInfo.tieneAusencia || ausenciaMedioDiaInfo.medioDia === 'tarde') eventosRequeridos.push('entrada');
-               if (!ausenciaMedioDiaInfo.tieneAusencia || ausenciaMedioDiaInfo.medioDia === 'manana') eventosRequeridos.push('salida');
+               eventosRequeridos.push('entrada');
+               eventosRequeridos.push('salida');
             }
           }
           else {
@@ -319,6 +549,48 @@ export async function POST(request: NextRequest) {
             console.log(`  - Eventos a añadir (${eventosFaltantes.length}): ${eventosFaltantesStr}`);
           } else if (fichaje.eventos.length === 0) {
             console.log(`[API Cuadrar] Fichaje vacío ${fichajeId}: Creando ${eventosRequeridos.length} eventos según jornada`);
+          }
+
+          // ========================================
+          // PRIORIDAD 1: Usar Eventos Propuestos (Pre-calculados por Worker)
+          // ========================================
+          // Si el fichaje tiene eventos propuestos calculados, usarlos primero
+          // antes de intentar cálculo histórico o defaults
+          const eventosPropuestos = await tx.fichaje_eventos_propuestos.findMany({
+            where: { fichajeId },
+            orderBy: { hora: 'asc' },
+          });
+
+          if (eventosPropuestos.length > 0 && eventosFaltantes.length > 0) {
+            console.log(`[API Cuadrar] Usando ${eventosPropuestos.length} eventos propuestos para fichaje ${fichajeId}`);
+
+            for (const eventoPropuesto of eventosPropuestos) {
+              // Solo crear el evento si:
+              // 1. Está en la lista de faltantes
+              // 2. NO existe ya en los eventos reales
+              if (eventosFaltantes.includes(eventoPropuesto.tipo) && !tiposEventos.includes(eventoPropuesto.tipo)) {
+                await tx.fichaje_eventos.create({
+                  data: {
+                    fichajeId,
+                    tipo: eventoPropuesto.tipo,
+                    hora: eventoPropuesto.hora,
+                    editado: true,
+                    motivoEdicion: `Evento propuesto automáticamente (método: ${eventoPropuesto.metodo})`,
+                  },
+                });
+                tiposEventos.push(eventoPropuesto.tipo);
+                console.log(`[API Cuadrar] Evento ${eventoPropuesto.tipo} creado desde propuesta (${eventoPropuesto.metodo})`);
+              }
+            }
+
+            // Actualizar eventos faltantes tras aplicar propuestas
+            eventosFaltantes = eventosRequeridos.filter((req) => !tiposEventos.includes(req));
+
+            // Si ya no faltan eventos, saltar al cierre
+            if (eventosFaltantes.length === 0) {
+              console.log(`[API Cuadrar] Todos los eventos completados con propuestas para fichaje ${fichajeId}`);
+              // Continuar al final del loop para cerrar el fichaje
+            }
           }
 
           const minutosDescansoConfig = (() => {
@@ -376,6 +648,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Si no faltan eventos, solo cerrar
+          // (puede ser porque: 1) eventos propuestos completaron todo, 2) pausa_fin calculada, o 3) eventos ya existían)
           if (eventosFaltantes.length === 0) {
             await tx.fichajes.update({
               where: { id: fichajeId },
@@ -390,7 +663,10 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          // Intentar completar eventos usando promedio histórico
+          // ========================================
+          // PRIORIDAD 2: Promedio Histórico (Fallback si eventos propuestos no completan)
+          // ========================================
+          // Solo se ejecuta si eventos propuestos no completaron todos los eventos faltantes
           const promedioHistorico = await obtenerPromedioEventosHistoricos(
             fichaje.empleadoId,
             fichaje.fecha,
@@ -456,11 +732,17 @@ export async function POST(request: NextRequest) {
             if (config.tipo === 'fija' || (configDia?.entrada && configDia.salida)) {
               if (!configDia) continue; // Safety check
 
-              // Entrada - solo si falta y no hay ausencia de mañana
+              // Entrada - solo si falta y NO hay ausencia de mañana
               if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
-                const [horas, minutos] = (configDia.entrada || '09:00').split(':').map(Number);
-                const hora = crearFechaConHora(fechaBase, horas, minutos);
-                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora, editado: true, motivoEdicion: 'Entrada propuesta al cuadrar' } });
+                // Validar que la hora de entrada NO esté en horario de ausencia
+                if (ausenciaMedioDiaInfo.tieneAusencia && ausenciaMedioDiaInfo.medioDia === 'manana') {
+                  // Si ausencia mañana, NO crear entrada (debe venir a trabajar directamente después)
+                  console.warn(`[API Cuadrar] Fichaje ${fichajeId} tiene ausencia mañana - NO se crea entrada propuesta`);
+                } else {
+                  const [horas, minutos] = (configDia.entrada || '09:00').split(':').map(Number);
+                  const hora = crearFechaConHora(fechaBase, horas, minutos);
+                  await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora, editado: true, motivoEdicion: 'Entrada propuesta al cuadrar' } });
+                }
               }
               
               // Pausas - solo si faltan y no hay ausencia de medio día
@@ -483,11 +765,17 @@ export async function POST(request: NextRequest) {
                 await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora, editado: true, motivoEdicion: 'Pausa fin propuesta al cuadrar' } });
               }
               
-              // Salida - solo si falta y no hay ausencia de tarde
+              // Salida - solo si falta y NO hay ausencia de tarde
               if (eventosFaltantes.includes('salida') && !tiposEventos.includes('salida')) {
-                const [h, m] = (configDia.salida || '18:00').split(':').map(Number);
-                const hora = crearFechaConHora(fechaBase, h, m);
-                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora, editado: true, motivoEdicion: 'Salida propuesta al cuadrar' } });
+                // Validar que la hora de salida NO esté en horario de ausencia
+                if (ausenciaMedioDiaInfo.tieneAusencia && ausenciaMedioDiaInfo.medioDia === 'tarde') {
+                  // Si ausencia tarde, NO crear salida (debe haberse ido antes)
+                  console.warn(`[API Cuadrar] Fichaje ${fichajeId} tiene ausencia tarde - NO se crea salida propuesta`);
+                } else {
+                  const [h, m] = (configDia.salida || '18:00').split(':').map(Number);
+                  const hora = crearFechaConHora(fechaBase, h, m);
+                  await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora, editado: true, motivoEdicion: 'Salida propuesta al cuadrar' } });
+                }
               }
             } 
             else if (config.tipo === 'flexible') {
@@ -563,7 +851,19 @@ export async function POST(request: NextRequest) {
           }
 
           const horasEnPausa = calcularTiempoEnPausa(eventosActualizados);
-          
+
+          // VALIDACIÓN FASE 6.2: Detectar salida sin descanso obligatorio
+          const requiereDescanso = typeof config.descansoMinimo === 'string' && config.descansoMinimo !== '00:00';
+          const tienePausas = eventosActualizados.some(e => e.tipo === 'pausa_inicio') &&
+                             eventosActualizados.some(e => e.tipo === 'pausa_fin');
+
+          if (requiereDescanso && !tienePausas && !ausenciaMedioDiaInfo.tieneAusencia) {
+            console.warn(
+              `[API Cuadrar] ⚠️ ADVERTENCIA: Fichaje ${fichajeId} finalizado SIN descanso cuando la jornada lo requiere. ` +
+              `Horas trabajadas: ${horasTrabajadas}h. Esto puede indicar que el empleado no tomó descanso.`
+            );
+          }
+
           await tx.fichajes.update({
             where: { id: fichajeId },
             data: {
@@ -585,8 +885,8 @@ export async function POST(request: NextRequest) {
         }
       }
     }, {
-      timeout: 20000, // Aumentar timeout para batches grandes
-      maxWait: 5000 
+      timeout: timeoutMs, // Timeout dinámico basado en cantidad de fichajes
+      maxWait: 10000  // Aumentado a 10s para manejar picos de carga
     });
 
     // FIX: Ya no necesitamos post-procesamiento de cálculo de horas

@@ -76,10 +76,43 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       return badRequestResponse('El plazo para rechazar esta edición ha expirado');
     }
 
-    // 3. REVERTIR cambios en TRANSACCIÓN
-    await prisma.$transaction(async (tx) => {
-      const cambios = edicion.cambios as Array<any>;
+    // 3. VALIDAR que todos los cambios son revertibles ANTES de transacción
+    const cambios = edicion.cambios as Array<any>;
 
+    for (const cambio of cambios) {
+      switch (cambio.accion) {
+        case 'crear':
+          // Verificar que el evento creado aún existe
+          const eventoCreado = await prisma.fichaje_eventos.findUnique({
+            where: { id: cambio.eventoId },
+          });
+          if (!eventoCreado) {
+            return badRequestResponse(
+              `No se puede revertir: El evento creado (${cambio.tipo}) ya no existe en el sistema`
+            );
+          }
+          break;
+
+        case 'editar':
+          // Verificar que el evento editado aún existe
+          const eventoEditado = await prisma.fichaje_eventos.findUnique({
+            where: { id: cambio.eventoId },
+          });
+          if (!eventoEditado) {
+            return badRequestResponse(
+              `No se puede revertir: El evento editado (${cambio.tipo}) ya no existe en el sistema`
+            );
+          }
+          break;
+
+        case 'eliminar':
+          // No requiere validación previa (se va a crear de nuevo)
+          break;
+      }
+    }
+
+    // 4. REVERTIR cambios en TRANSACCIÓN
+    await prisma.$transaction(async (tx) => {
       // Revertir en orden inverso para mantener integridad
       const cambiosRevertidos = [...cambios].reverse();
 
@@ -143,30 +176,39 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
       // Determinar estado original
       const validacionCompleto = await validarFichajeCompleto(edicion.fichajeId);
-      let estadoOriginal = 'en_curso';
+      let estadoOriginal: 'en_curso' | 'finalizado' | 'pendiente' = 'en_curso';
       if (validacionCompleto.completo) {
         estadoOriginal = 'finalizado';
       } else if (fichajeActualizado.eventos.length === 0) {
         estadoOriginal = 'pendiente';
       }
 
+      // NUEVO: Marcar fichaje como rechazado (congelado) tras revertir
       await tx.fichajes.update({
         where: { id: edicion.fichajeId },
         data: {
           horasTrabajadas,
           horasEnPausa,
-          estado: estadoOriginal,
+          estado: 'rechazado', // Congelado por discrepancia
         },
       });
 
-      // 5. Marcar edición como rechazada
-      await tx.ediciones_fichaje_pendientes.update({
-        where: { id: edicion.id },
+      // 5. Marcar edición como rechazada (OPTIMISTIC LOCKING)
+      const edicionUpdated = await tx.ediciones_fichaje_pendientes.updateMany({
+        where: {
+          id: edicion.id,
+          estado: 'pendiente' // Solo si aún está pendiente
+        },
         data: {
           estado: 'rechazado',
           rechazadoEn: new Date(),
         },
       });
+
+      // Verificar que se actualizó (no fue expirada automáticamente)
+      if (edicionUpdated.count === 0) {
+        throw new Error('La edición ya fue procesada o expiró');
+      }
 
       // 6. Marcar notificación como leída
       await tx.notificaciones.update({

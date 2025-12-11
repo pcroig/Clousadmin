@@ -3,7 +3,7 @@
 import { ArrowLeft, Clock, MoreVertical } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { EditarJornadaEmpleadoModal } from '@/components/hr/editar-jornada-empleado-modal';
 import { AusenciasTab as AusenciasTabShared } from '@/components/shared/mi-espacio/ausencias-tab';
@@ -39,6 +39,11 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>('general');
   const [mostrarModalJornada, setMostrarModalJornada] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleFieldUpdate = async (field: keyof MiEspacioEmpleado, value: unknown) => {
     try {
@@ -87,35 +92,38 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
             email={usuario.email}
             fotoUrl={empleado.fotoUrl}
             showEditButton
+            activo={empleado.activo}
           />
         </div>
 
         <div className="flex items-center gap-2">
           {/* Menú de opciones */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-lg"
-                title="Más opciones"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setMostrarModalJornada(true)}>
-                <Clock className="mr-2 h-4 w-4" />
-                Cambiar jornada
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={triggerDarDeBaja}
-                className="text-red-600"
-              >
-                Dar de baja
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {isMounted && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-lg"
+                  title="Más opciones"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setMostrarModalJornada(true)}>
+                  <Clock className="mr-2 h-4 w-4" />
+                  Cambiar jornada
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={triggerDarDeBaja}
+                  className="text-red-600"
+                >
+                  Dar de baja
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

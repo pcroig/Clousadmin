@@ -11,6 +11,9 @@ import { prisma } from '@/lib/prisma';
 
 import { NominaDetailsClient, type NominaDetailsClientProps } from './nomina-details-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 const decimalToNumber = (value: Prisma.Decimal | number | null | undefined): number => {
   if (value == null) return 0;
   return typeof value === 'number' ? value : value.toNumber();

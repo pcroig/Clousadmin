@@ -10,6 +10,9 @@ import { prisma } from '@/lib/prisma';
 
 import { CarpetaDetailClientEmpleado } from '@/app/(dashboard)/empleado/mi-espacio/documentos/[id]/carpeta-detail-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function ManagerMiEspacioCarpetaDetailPage(context: { params: Promise<{ id: string }> }) {
   const params = await context.params;
   const session = await getSession();

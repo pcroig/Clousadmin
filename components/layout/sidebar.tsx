@@ -144,7 +144,7 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
     }
 
     if (rol === UsuarioRol.empleado) {
-      router.push('/empleado/mi-espacio/datos');
+      router.push('/empleado/mi-espacio');
       return;
     }
 
@@ -251,7 +251,7 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
     },
     {
       name: 'Mi espacio',
-      href: '/empleado/mi-espacio/datos',
+      href: '/empleado/mi-espacio',
       icon: User,
     },
     {
@@ -263,11 +263,6 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
       name: 'Fichajes',
       href: '/empleado/mi-espacio/fichajes',
       icon: Clock,
-    },
-    {
-      name: 'Contratos',
-      href: '/empleado/mi-espacio/contratos',
-      icon: FileText,
     },
     {
       name: 'Documentos',

@@ -497,10 +497,30 @@ export function FichajeWidget({
     handleFichar('salida', false, true);
   }
 
-  function handleEditarEventos() {
+  async function handleEditarEventos() {
     setShowDescansoDialog(false);
-    // Siempre abrir modal de edición con el fichajeId actual
-    setEditarModalOpen(true);
+
+    if (!state.fichajeId) {
+      toast.error('No hay fichaje activo para editar');
+      return;
+    }
+
+    // Validar estado antes de abrir modal
+    try {
+      const response = await fetch(`/api/fichajes?id=${state.fichajeId}`);
+      const data = await response.json() as { data?: Array<{ estado?: string }> };
+      const fichaje = data.data?.[0];
+
+      if (fichaje?.estado === 'rechazado') {
+        toast.error('Este fichaje fue rechazado y no se puede editar');
+        return;
+      }
+
+      setEditarModalOpen(true);
+    } catch (error) {
+      console.error('Error validando fichaje:', error);
+      setEditarModalOpen(true); // Abrir de todos modos en caso de error
+    }
   }
 
   function getTextoBoton() {
@@ -716,7 +736,26 @@ export function FichajeWidget({
                     <Button
                       variant="outline"
                       className="w-full font-semibold text-[12px] py-2"
-                      onClick={() => setEditarModalOpen(true)}
+                      onClick={async () => {
+                        if (!state.fichajeId) return;
+
+                        // Validar estado actual del fichaje antes de abrir modal
+                        try {
+                          const response = await fetch(`/api/fichajes?id=${state.fichajeId}`);
+                          const data = await response.json() as { data?: Array<{ estado?: string }> };
+                          const fichaje = data.data?.[0];
+
+                          if (fichaje?.estado === 'rechazado') {
+                            toast.error('Este fichaje fue rechazado y no se puede editar');
+                            return;
+                          }
+
+                          setEditarModalOpen(true);
+                        } catch (error) {
+                          console.error('Error validando fichaje:', error);
+                          setEditarModalOpen(true); // Abrir de todos modos en caso de error
+                        }
+                      }}
                       disabled={!state.fichajeId}
                     >
                       Editar fichaje

@@ -56,6 +56,11 @@ export async function POST(req: NextRequest) {
       return notFoundResponse('Fichaje no encontrado');
     }
 
+    // CRÍTICO: Validar que el fichaje NO esté rechazado
+    if (fichaje.estado === 'rechazado') {
+      return notFoundResponse('Este fichaje fue rechazado y no se puede modificar');
+    }
+
     // CRÍTICO: Marcar como editado si:
     // 1. Es edición manual (desde modal de edición), O
     // 2. Tiene motivo de edición

@@ -8,6 +8,9 @@ import { FichajesClient } from '@/app/(dashboard)/hr/horario/fichajes/fichajes-c
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function ManagerFichajesPage(props: {
   searchParams: Promise<{ estado?: string }>;
 }) {

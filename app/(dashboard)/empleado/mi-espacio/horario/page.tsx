@@ -12,6 +12,9 @@ import { HorarioMiEspacioClient } from './horario-mi-espacio-client';
 
 import type { ausencias } from '@prisma/client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function HorarioMiEspacioPage() {
   const session = await getSession();
 

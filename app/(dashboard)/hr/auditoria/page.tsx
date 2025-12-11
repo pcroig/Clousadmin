@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 function formatDate(date: Date): string {
   return new Intl.DateTimeFormat('es-ES', {
     dateStyle: 'short',

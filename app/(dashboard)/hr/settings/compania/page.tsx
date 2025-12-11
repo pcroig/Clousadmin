@@ -10,6 +10,8 @@ import { prisma } from '@/lib/prisma';
 
 import { CompanyClient } from './company-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
 
 export default async function CompanySettingsPage() {
   const session = await getSession();

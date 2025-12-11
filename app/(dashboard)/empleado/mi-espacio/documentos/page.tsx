@@ -8,6 +8,9 @@ import { prisma } from '@/lib/prisma';
 
 import { MiEspacioDocumentosClient } from './documentos-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function MiEspacioDocumentosPage() {
   const session = await getSession();

@@ -7,6 +7,9 @@ import { prisma } from '@/lib/prisma';
 
 import { MiEspacioFichajesClient } from './fichajes-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function EmpleadoFichajesPage() {
   const session = await getSession();
 

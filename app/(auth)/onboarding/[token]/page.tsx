@@ -15,6 +15,9 @@ import {
 
 import { OnboardingForm } from './onboarding-form';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function OnboardingPage(context: { params: Promise<{ token: string }> }) {
   const params = await context.params;
   const { token } = params;

@@ -11,9 +11,11 @@ import {
   FileType,
   Loader2,
 } from 'lucide-react';
+import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
 
 import { LoadingButton } from '@/components/shared/loading-button';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -85,6 +87,10 @@ export function GenerarDesdePlantillaModal({
   const [requiereFirma, setRequiereFirma] = useState(false);
   const [fechaLimiteFirma, setFechaLimiteFirma] = useState('');
   const [mensajeFirma, setMensajeFirma] = useState('');
+  const parseDateValue = (value?: string) => (value ? new Date(`${value}T00:00:00`) : undefined);
+  const handleFechaLimiteSelect = (date: Date | undefined) => {
+    setFechaLimiteFirma(date ? format(date, 'yyyy-MM-dd') : '');
+  };
 
   // Estado de procesamiento
   const [jobId, setJobId] = useState<string | null>(null);
@@ -465,10 +471,11 @@ export function GenerarDesdePlantillaModal({
           <div className="ml-6 space-y-3 border-l-2 border-blue-200 pl-4">
             <div>
               <Label>Fecha límite para firmar (opcional)</Label>
-              <Input
-                type="date"
-                value={fechaLimiteFirma}
-                onChange={(e) => setFechaLimiteFirma(e.target.value)}
+              <ResponsiveDatePicker
+                date={parseDateValue(fechaLimiteFirma)}
+                onSelect={handleFechaLimiteSelect}
+                placeholder="Seleccionar fecha"
+                label="Seleccionar fecha límite de firma"
               />
             </div>
             <div>

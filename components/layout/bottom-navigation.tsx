@@ -60,12 +60,11 @@ export function BottomNavigation({ rol }: BottomNavigationProps) {
       isActive: (path) => path.includes('/empleado/mi-espacio/documentos'),
     },
     {
-      name: 'Otros',
-      href: '/empleado/mi-espacio/datos',
+      name: 'Perfil',
+      href: '/empleado/mi-espacio',
       icon: MoreHorizontal,
       isActive: (path) =>
-        path.includes('/empleado/mi-espacio/datos') ||
-        path.includes('/empleado/mi-espacio/contratos') ||
+        path === '/empleado/mi-espacio' ||
         path.includes('/empleado/mi-espacio/nominas'),
     },
   ];

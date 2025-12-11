@@ -94,11 +94,6 @@ export async function PATCH(
       return notFoundResponse('Jornada no encontrada');
     }
 
-    // No permitir editar jornadas predefinidas
-    if (jornadaExistente.esPredefinida) {
-      return badRequestResponse('No se pueden editar jornadas predefinidas');
-    }
-
     const dataToUpdate: Prisma.jornadasUpdateInput = {
       // NOTE: 'nombre' field has been removed from Jornada model
       horasSemanales: validatedData.horasSemanales,
@@ -145,11 +140,6 @@ export async function DELETE(
 
     if (!jornada) {
       return notFoundResponse('Jornada no encontrada');
-    }
-
-    // No permitir eliminar jornadas predefinidas
-    if (jornada.esPredefinida) {
-      return badRequestResponse('No se pueden eliminar jornadas predefinidas');
     }
 
     // Si hay empleados asignados, desasignarlos automáticamente

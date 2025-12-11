@@ -17,7 +17,7 @@ import {
   CalendarioStep,
   type CalendarioStepHandle,
 } from '@/components/onboarding/calendario-step';
-import { AddPersonaDocumentForm } from '@/components/organizacion/add-persona-document-form';
+import { AddEmpleadosOnboarding } from '@/components/onboarding/add-empleados-onboarding';
 import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
 import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
 import {
@@ -315,7 +315,7 @@ export function SignupForm({ token, emailInvitacion, prefill, cuentaYaCreada }: 
     },
     {
       titulo: 'Añade empleados',
-      descripcion: 'Importa desde Excel o añade manualmente. Necesitas al menos 1 empleado para continuar',
+      descripcion: 'Añade manualmente, desde un documento o importa desde Excel. Necesitas al menos 1 empleado para continuar',
     },
     {
       titulo: 'Configura las sedes',
@@ -576,7 +576,7 @@ export function SignupForm({ token, emailInvitacion, prefill, cuentaYaCreada }: 
             </div>
           )}
 
-          <AddPersonaDocumentForm
+          <AddEmpleadosOnboarding
             onSuccess={() => {
               toast.success('Empleado(s) añadido(s) correctamente');
               // Recargar contador

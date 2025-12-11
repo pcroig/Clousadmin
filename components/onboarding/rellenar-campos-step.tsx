@@ -91,6 +91,7 @@ export function RellenarCamposStep({
                     <FormControl>
                       <Input
                         {...field}
+                        value={field.value as string || ''}
                         type={campoId === 'fechaNacimiento' ? 'date' : 'text'}
                         placeholder={`Ingresa tu ${campo.label.toLowerCase()}`}
                       />

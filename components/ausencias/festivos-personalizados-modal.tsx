@@ -1,11 +1,13 @@
 'use client';
 
+import { format } from 'date-fns';
 import { Calendar, Pencil, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -86,6 +88,11 @@ export function FestivosPersonalizadosModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const parseDateValue = (value?: string) => (value ? new Date(`${value}T00:00:00`) : undefined);
+  const handleDateSelect = (date: Date | undefined) => {
+    setEditingFecha(date ? format(date, 'yyyy-MM-dd') : '');
+  };
 
   const isHR = contexto === 'hr_admin';
 
@@ -359,10 +366,11 @@ const renderEditingView = () => (
     <div className="flex flex-wrap gap-3">
       <div className="flex-1 min-w-[180px]">
         <Label className="text-xs text-gray-600">Nueva fecha</Label>
-        <Input
-          type="date"
-          value={editingFecha}
-          onChange={(e) => setEditingFecha(e.target.value)}
+        <ResponsiveDatePicker
+          date={parseDateValue(editingFecha)}
+          onSelect={handleDateSelect}
+          placeholder="Seleccionar fecha"
+          label="Seleccionar fecha de festivo"
           className="text-sm mt-1"
         />
       </div>

@@ -12,6 +12,9 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { WaitlistForm } from './waitlist-form';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function WaitlistPage() {
   // Si el usuario ya está autenticado, redirigir
   const session = await getSession();

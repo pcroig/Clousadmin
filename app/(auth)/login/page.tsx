@@ -13,6 +13,9 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { LoginForm } from './login-form';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function LoginPage({
   searchParams,
 }: {

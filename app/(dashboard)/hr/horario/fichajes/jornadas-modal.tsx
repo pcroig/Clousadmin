@@ -67,6 +67,7 @@ interface Jornada {
   asignacion?: {
     nivelAsignacion: string;
     equipoIds?: string[] | null;
+    empleadoIds?: string[] | null;
   } | null;
   empleados?: Array<{
     id: string;
@@ -240,10 +241,11 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
               nivel,
               equipoIds: Array.isArray(asignacion.equipoIds) ? asignacion.equipoIds : [],
             };
-          } else if (nivel === 'individual' && jornada.empleados) {
+          } else if (nivel === 'individual' && asignacion.empleadoIds) {
+            // Load empleadoIds from asignacion metadata, not from jornada.empleados
             asignacionesLocales[index] = {
               nivel,
-              empleadoIds: jornada.empleados.map(e => e.id),
+              empleadoIds: Array.isArray(asignacion.empleadoIds) ? asignacion.empleadoIds : [],
             };
           } else {
             asignacionesLocales[index] = { nivel };
@@ -395,7 +397,10 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
 
       // Validar que tenga asignación válida
       const asignacion = asignaciones[index];
-      if (asignacion) {
+      if (!asignacion) {
+        toast.error(`Jornada ${index + 1}: Debes seleccionar a quién se asigna (empresa, equipos o empleados)`);
+        isValid = false;
+      } else {
         if (asignacion.nivel === 'equipo' && (!asignacion.equipoIds || asignacion.equipoIds.length === 0)) {
           toast.error(`Jornada ${index + 1}: Debes seleccionar al menos un equipo`);
           isValid = false;
@@ -419,8 +424,14 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     console.log('[VALIDACION] Total equipos disponibles:', equipos.length);
     console.log('[VALIDACION] Asignaciones:', asignaciones);
 
-    Object.entries(asignaciones).forEach(([indexStr, asignacion]) => {
-      const index = parseInt(indexStr);
+    // Iterar sobre JORNADAS, no sobre asignaciones (para incluir jornadas nuevas)
+    jornadas.forEach((_, index) => {
+      const asignacion = asignaciones[index];
+      if (!asignacion) {
+        console.log(`[VALIDACION] ⚠️ Jornada ${index + 1} no tiene asignación definida`);
+        return;
+      }
+
       const empleadosEnJornada = new Set<string>();
 
       console.log(`[VALIDACION] Jornada ${index + 1} - Nivel: ${asignacion.nivel}`);
@@ -537,17 +548,8 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
       console.log('[GUARDAR] Jornadas existentes:', jornadasExistentesIds);
       console.log('[GUARDAR] Jornadas a eliminar:', jornadasAEliminar);
 
-      // Validar que las jornadas a eliminar no tengan empleados asignados
-      for (const jornadaId of jornadasAEliminar) {
-        const jornadaExistente = jornadasExistentes.find(j => j.id === jornadaId);
-        if (jornadaExistente && jornadaExistente._count && jornadaExistente._count.empleados > 0) {
-          setGuardando(false);
-          toast.error(`No se puede eliminar una jornada con ${jornadaExistente._count.empleados} empleado(s) asignado(s). Primero reasigna los empleados.`);
-          return;
-        }
-      }
-
       // Eliminar jornadas que fueron removidas del modal
+      // Nota: El backend desasigna automáticamente los empleados si es necesario
       for (const jornadaId of jornadasAEliminar) {
         console.log('[GUARDAR] Eliminando jornada:', jornadaId);
         const response = await fetch(`/api/jornadas/${jornadaId}`, { method: 'DELETE' });
@@ -748,7 +750,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                             {label}
                           </div>
                         </AccordionTrigger>
-                        {jornadas.length > 1 && !jornada.esPredefinida && (
+                        {jornadas.length > 1 && (
                           <Button
                             type="button"
                             variant="ghost"
@@ -769,7 +771,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                           data={jornada}
                           onChange={(data) => updateJornada(index, data)}
                           errors={errors[index] || {}}
-                          disabled={guardando || jornada.esPredefinida}
+                          disabled={guardando}
                           showAsignacion={true}
                           nivelAsignacion={asignacion.nivel}
                           onNivelAsignacionChange={(nivel) => handleNivelAsignacionChange(index, nivel)}

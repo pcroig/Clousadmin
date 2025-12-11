@@ -68,14 +68,16 @@ export async function generarAlertasParaNomina(
 ): Promise<number> {
 
   // Obtener datos del empleado y contrato
-  const empleadoQuery = {
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
-    include: {
-      jornada: {
+    select: {
+      id: true,
+      iban: true,
+      nss: true,
+      jornadaId: true,
+      equipos: {
         select: {
-          id: true,
-          config: true,
-          horasSemanales: true,
+          equipoId: true,
         },
       },
       contratos: {
@@ -87,14 +89,43 @@ export async function generarAlertasParaNomina(
         },
         orderBy: { fechaInicio: 'desc' },
         take: 1,
+        select: {
+          id: true,
+          salarioBaseAnual: true,
+          fechaInicio: true,
+          fechaFin: true,
+        },
       },
     },
-  } satisfies Prisma.empleadosFindUniqueArgs;
-
-  const empleado = await prisma.empleados.findUnique(empleadoQuery);
+  });
 
   if (!empleado) {
     return 0;
+  }
+
+  // Resolver jornada efectiva (individual > equipo > empresa)
+  const equipoIds = empleado.equipos
+    .map(eq => eq.equipoId)
+    .filter((id): id is string => Boolean(id));
+
+  const { obtenerJornadaEmpleado } = await import('@/lib/jornadas/helpers');
+  const jornadaInfo = await obtenerJornadaEmpleado({
+    empleadoId: empleado.id,
+    equipoIds,
+    jornadaIdDirecta: empleado.jornadaId,
+  });
+
+  // Obtener datos completos de la jornada si existe
+  let jornada = null;
+  if (jornadaInfo && jornadaInfo.jornadaId) {
+    jornada = await prisma.jornadas.findUnique({
+      where: { id: jornadaInfo.jornadaId },
+      select: {
+        id: true,
+        config: true,
+        horasSemanales: true,
+      },
+    });
   }
 
   const alertas: AlertaData[] = [];
@@ -177,10 +208,8 @@ export async function generarAlertasParaNomina(
   }
 
   // === ALERTAS DE ADVERTENCIA/INFO: Horas Trabajadas ===
-  
-  if (contratoActual) {
-    const jornada = empleado.jornada;
 
+  if (contratoActual) {
     if (jornada) {
       const horasEsperadasMes = Number(jornada.horasSemanales ?? 0) * 4.33; // Promedio semanas por mes
       

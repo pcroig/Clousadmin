@@ -158,7 +158,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
   const requiresSolicitud = isEmpleado || isManager; // Empleados y managers crean solicitudes
 
   const labelClass = MOBILE_DESIGN.components.form.label;
-  const inputClass = MOBILE_DESIGN.components.form.input;
 
   const {
     copyToClipboard: copyIban,
@@ -336,7 +335,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                 </InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
-            <p className="mt-1 text-xs text-gray-500">Aún no hay datos guardados para este campo.</p>
           </div>
         );
       }
@@ -351,9 +349,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
             onChange={(event) => onChange(event.target.value)}
             onBlur={(event) => onBlur?.(event.target.value)}
             placeholder={placeholder}
-            className={inputClass}
           />
-          <p className="mt-1 text-xs text-gray-500">Aún no hay datos guardados para este campo.</p>
         </div>
       );
     }
@@ -455,7 +451,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
             }}
             readOnly={!unlocked}
             placeholder={unlocked ? placeholder : 'Desbloquea para ver'}
-            className={cn(inputClass, 'pr-24')}
+            className="pr-24"
           />
           {unlocked ? (
             <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-emerald-600">
@@ -582,7 +578,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
         {/* Información Personal */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Información Personal</h3>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {renderSensitiveInput('nif', {
               id: 'nif',
               label: 'DNI/NIE',
@@ -645,6 +641,37 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               />
             </div>
             <div>
+              <Label htmlFor="email" className={labelClass}>
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFieldValue('email', e.target.value)}
+                  />
+            </div>
+            <div>
+              <Label htmlFor="telefono" className={labelClass}>
+                Teléfono
+              </Label>
+              <Input
+                id="telefono"
+                type="tel"
+                value={formData.telefono}
+                onChange={(e) => setFieldValue('telefono', e.target.value)}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = e.target.value || null;
+                    if (newValue !== (empleado.telefono || null)) {
+                      handleFieldUpdate('telefono', newValue);
+                    }
+                  }
+                }}
+                placeholder="No especificado"
+                  />
+            </div>
+            <div>
               <Label htmlFor="numeroHijos" className={labelClass}>
                 Número de Hijos
               </Label>
@@ -663,8 +690,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }
                 }}
                 min="0"
-                className={inputClass}
-              />
+                  />
             </div>
             <div>
               <Label htmlFor="genero" className={labelClass}>
@@ -689,43 +715,10 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
           </div>
         </div>
 
-        {/* Información de Contacto */}
+        {/* Dirección */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Información de Contacto</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Dirección</h3>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="email" className={labelClass}>
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFieldValue('email', e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <Label htmlFor="telefono" className={labelClass}>
-                Teléfono
-              </Label>
-              <Input
-                id="telefono"
-                type="tel"
-                value={formData.telefono}
-                onChange={(e) => setFieldValue('telefono', e.target.value)}
-                onBlur={(e) => {
-                  if (isHrAdmin && onFieldUpdate) {
-                    const newValue = e.target.value || null;
-                    if (newValue !== (empleado.telefono || null)) {
-                      handleFieldUpdate('telefono', newValue);
-                    }
-                  }
-                }}
-                placeholder="No especificado"
-                className={inputClass}
-              />
-            </div>
             <div>
               <Label htmlFor="direccionCalle" className={labelClass}>
                 Calle
@@ -743,8 +736,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }
                 }}
                 placeholder="No especificada"
-                className={inputClass}
-              />
+                  />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -764,8 +756,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }}
                   placeholder="No especificado"
-                  className={inputClass}
-                />
+                      />
               </div>
               <div>
                 <Label htmlFor="direccionPiso" className={labelClass}>
@@ -784,8 +775,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }}
                   placeholder="Opcional"
-                  className={inputClass}
-                />
+                      />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -807,8 +797,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }}
                   placeholder="No especificado"
                   maxLength={5}
-                  className={inputClass}
-                />
+                      />
               </div>
               <div>
                 <Label htmlFor="ciudad" className={labelClass}>
@@ -827,8 +816,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }}
                   placeholder="No especificada"
-                  className={inputClass}
-                />
+                      />
               </div>
             </div>
             <div>
@@ -848,8 +836,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }
                 }}
                 placeholder="No especificada"
-                className={inputClass}
-              />
+                  />
             </div>
           </div>
         </div>
@@ -876,7 +863,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
             })}
             <div>
               <Label htmlFor="bic" className={labelClass}>
-                Código BIC
+                BIC/SWIFT
               </Label>
               <InputGroup>
                 <InputGroupInput
@@ -895,8 +882,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }}
                   placeholder="Ej: BBVAESMMXXX"
-                  className={inputClass}
-                />
+                      />
                 <InputGroupAddon align="inline-end" className="gap-1">
                   <TooltipProvider delayDuration={0}>
                     <Tooltip>

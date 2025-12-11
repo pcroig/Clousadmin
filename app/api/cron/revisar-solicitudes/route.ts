@@ -27,6 +27,9 @@ import { crearNotificacionSolicitudRequiereRevision } from '@/lib/notificaciones
 import { prisma } from '@/lib/prisma';
 import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Configuración: periodo en horas para considerar solicitudes elegibles
 const PERIODO_REVISION_HORAS = parseInt(process.env.SOLICITUDES_PERIODO_REVISION_HORAS || '48');
 
@@ -228,32 +231,25 @@ export async function POST(request: NextRequest) {
 
     for (const solicitud of solicitudesCorreccion) {
       try {
-        // Verificar si es corrección optimista
-        const detalles = solicitud.detalles as {
-          eventos?: Array<{tipo: string, hora: string, editado: boolean}>;
-          origen?: string;
-        };
-
-        // Verificar si es corrección optimista (cualquiera de los 3 casos)
-        if (!esOrigenOptimista(detalles.origen)) {
-          // No es corrección optimista, saltar
-          console.log(`[CRON Revisar Solicitudes] Solicitud ${solicitud.id} no es optimista (origen: ${detalles.origen}), omitiendo`);
+        // NUEVO: Validar que el fichaje NO esté rechazado (bloqueado)
+        if (solicitud.fichaje.estado === 'rechazado') {
+          console.log(`[CRON Revisar Solicitudes] Solicitud ${solicitud.id} omitida: fichaje rechazado`);
           continue;
         }
 
-        // Validar que el fichaje sigue finalizado antes de auto-aprobar
-        if (solicitud.fichaje.estado !== 'finalizado') {
-          console.log(`[CRON Revisar Solicitudes] Solicitud ${solicitud.id} omitida: fichaje no está finalizado (estado: ${solicitud.fichaje.estado})`);
-          continue;
-        }
+        // AUTO-APROBAR cualquier solicitud de empleado tras 48h
+        // Los cambios ya fueron aplicados optimistamente
+        const detalles = solicitud.detalles as { origen?: string };
+        console.log(`[CRON Revisar Solicitudes] Auto-aprobando solicitud ${solicitud.id} (origen: ${detalles.origen || 'desconocido'})`);
 
-        console.log(`[CRON Revisar Solicitudes] Auto-aprobando corrección optimista ${solicitud.id} (origen: ${detalles.origen})`);
-
-        // AUTO-APROBAR corrección optimista
+        // AUTO-APROBAR solicitud (OPTIMISTIC LOCKING)
         await prisma.$transaction(async (tx) => {
-          // 1. Actualizar solicitud a aprobada
-          await tx.solicitudes_correccion_fichaje.update({
-            where: { id: solicitud.id },
+          // 1. Actualizar solicitud a aprobada (solo si aún está pendiente)
+          const updated = await tx.solicitudes_correccion_fichaje.updateMany({
+            where: {
+              id: solicitud.id,
+              estado: 'pendiente' // OPTIMISTIC LOCK: Solo si aún está pendiente
+            },
             data: {
               estado: 'aprobada',
               revisadaPor: null, // Auto-aprobado por sistema
@@ -262,8 +258,14 @@ export async function POST(request: NextRequest) {
             }
           });
 
+          // Si count = 0, significa que HR la procesó justo antes → skip silenciosamente
+          if (updated.count === 0) {
+            console.log(`[CRON Revisar Solicitudes] Solicitud ${solicitud.id} ya fue procesada por otro proceso, omitiendo`);
+            return; // Salir de la transacción sin error
+          }
+
           // 2. Actualizar auto_completado
-          const updated = await tx.auto_completados.updateMany({
+          const autoCompletadoUpdated = await tx.auto_completados.updateMany({
             where: {
               datosOriginales: {
                 path: ['solicitudId'],
@@ -277,12 +279,12 @@ export async function POST(request: NextRequest) {
             }
           });
 
-          if (updated.count === 0) {
+          if (autoCompletadoUpdated.count === 0) {
             console.warn(`[CRON Revisar Solicitudes] No se encontró auto_completado para solicitud ${solicitud.id}`);
           }
         });
 
-        console.log(`[CRON Revisar Solicitudes] Corrección optimista ${solicitud.id} auto-aprobada`);
+        console.log(`[CRON Revisar Solicitudes] Solicitud ${solicitud.id} auto-aprobada`);
         correccionesAprobadas++;
       } catch (error) {
         const mensaje = `Error procesando corrección ${solicitud.id}: ${

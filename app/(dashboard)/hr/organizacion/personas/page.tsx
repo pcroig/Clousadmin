@@ -11,6 +11,9 @@ import { prisma } from '@/lib/prisma';
 
 import { PersonasClient } from './personas-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 // Server Component
 export default async function PersonasPage() {

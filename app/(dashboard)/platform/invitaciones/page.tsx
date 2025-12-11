@@ -17,6 +17,9 @@ import { UsuarioRol } from '@/lib/constants/enums';
 import { hasSubscriptionTable } from '@/lib/platform/subscriptions';
 import { prisma } from '@/lib/prisma';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 type PlatformMetrics = {
   totalCompanies: number;
   newCompaniesThisMonth: number;

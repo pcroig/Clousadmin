@@ -49,6 +49,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       return notFoundResponse('Evento no encontrado');
     }
 
+    // CRÍTICO: Validar que el fichaje NO esté rechazado
+    if (evento.fichaje.estado === 'rechazado') {
+      return notFoundResponse('Este fichaje fue rechazado y no se puede modificar');
+    }
+
     await prisma.fichaje_eventos.update({
       where: { id },
       data: {
@@ -116,6 +121,11 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
     });
     if (!evento || evento.fichaje.empresaId !== session.user.empresaId) {
       return notFoundResponse('Evento no encontrado');
+    }
+
+    // CRÍTICO: Validar que el fichaje NO esté rechazado
+    if (evento.fichaje.estado === 'rechazado') {
+      return notFoundResponse('Este fichaje fue rechazado y no se puede modificar');
     }
 
     await prisma.fichaje_eventos.delete({ where: { id } });

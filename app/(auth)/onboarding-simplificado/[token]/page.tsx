@@ -13,6 +13,9 @@ import { type DatosTemporales, type ProgresoOnboardingSimplificado, verificarTok
 
 import { OnboardingSimplificadoForm } from './onboarding-simplificado-form';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function OnboardingSimplificadoPage(context: { params: Promise<{ token: string }> }) {
     const params = await context.params;
   const { token } = params;

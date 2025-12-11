@@ -74,7 +74,7 @@ El onboarding con workflow tiene **4 pasos** (3 base + 1 workflow):
 
 1. **`rellenar_campos`** - Rellenar datos personales
    - Formulario con campos configurables
-   - Campos disponibles: NIF, NSS, teléfono, fecha nacimiento, dirección, IBAN, BIC, salario, tipo contrato
+   - Campos disponibles: DNI/NIE, Número de Seguridad Social, teléfono, fecha nacimiento, dirección, IBAN, BIC/SWIFT, salario, tipo contrato
    - Validación automática
    - Botón: "Guardar"
 
@@ -208,7 +208,7 @@ interface WorkflowAccion {
 **Configuración de campos disponibles:**
 ```typescript
 export const CAMPOS_DISPONIBLES = [
-  { id: 'nif', label: 'NIF' },
+  { id: 'nif', label: 'DNI/NIE' },
   { id: 'nss', label: 'Número de Seguridad Social' },
   { id: 'telefono', label: 'Teléfono' },
   { id: 'fechaNacimiento', label: 'Fecha de Nacimiento' },

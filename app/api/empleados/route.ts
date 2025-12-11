@@ -17,7 +17,7 @@ import { UsuarioRol } from '@/lib/constants/enums';
 import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 import { decryptEmpleadoList, encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { invitarEmpleado } from '@/lib/invitaciones';
-import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
+import { resolverJornadaParaNuevoEmpleado } from '@/lib/jornadas/resolver-para-nuevo';
 import { crearNotificacionEmpleadoCreado } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { empleadoSelectListado } from '@/lib/prisma/selects';
@@ -172,9 +172,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obtener o crear jornada por defecto (garantiza que siempre haya una)
-    const jornadaPorDefecto = await getOrCreateDefaultJornada(prisma, session.user.empresaId);
-
     // Crear usuario y empleado en transacción
     const result = await prisma.$transaction(async (tx) => {
       // Crear usuario
@@ -202,6 +199,55 @@ export async function POST(request: NextRequest) {
 
       const bicNormalizado = sanitizeOptionalString(body.bic);
 
+      // Resolver qué jornada asignar al nuevo empleado
+      // Respeta jerarquía: equipo > empresa > manual
+      let jornadaId: string | null = null;
+
+      // Si el usuario proporcionó jornadaId explícitamente, usarlo
+      if (body.jornadaId && typeof body.jornadaId === 'string') {
+        // Verificar que la jornada existe y pertenece a la empresa
+        const jornadaExiste = await tx.jornadas.findFirst({
+          where: {
+            id: body.jornadaId,
+            empresaId: session.user.empresaId,
+            activa: true,
+          },
+        });
+
+        if (!jornadaExiste) {
+          throw new Error('La jornada seleccionada no existe o no está activa');
+        }
+
+        jornadaId = body.jornadaId;
+        console.log(`[API POST /api/empleados] Jornada proporcionada explícitamente: ${jornadaId}`);
+      } else {
+        // Intentar resolver automáticamente
+        jornadaId = await resolverJornadaParaNuevoEmpleado(
+          tx,
+          session.user.empresaId,
+          equipoIdsInput
+        );
+
+        // VALIDACIÓN CONDICIONAL: Solo requerir jornada si NO es onboarding inicial
+        // Detectar onboarding inicial: empresa sin jornadas configuradas
+        const tieneJornadasConfiguradas = await tx.jornada_asignaciones.count({
+          where: { empresaId: session.user.empresaId }
+        }) > 0;
+
+        // Si jornadaId === null hay dos casos:
+        // 1. Hay asignación de empresa/equipo → null es CORRECTO (resolución dinámica)
+        // 2. NO hay asignación automática → null requiere validación
+        // Para distinguir, verificamos si hay jornadas configuradas
+        if (!tieneJornadasConfiguradas && jornadaId === null) {
+          // Caso onboarding inicial: permitir sin jornada (se asignará en paso 3)
+          console.log(`[API POST /api/empleados] Onboarding inicial - empleado sin jornada permitido`);
+        } else if (tieneJornadasConfiguradas && jornadaId === null) {
+          // Caso empresa operativa: jornadaId null significa que HAY asignación automática
+          // (empresa o equipo) - esto es CORRECTO, no es un error
+          console.log(`[API POST /api/empleados] Asignación automática detectada - jornadaId: null (resolución dinámica)`);
+        }
+      }
+
       const empleadoData = {
         usuarioId: usuario.id,
         empresaId: session.user.empresaId,
@@ -224,7 +270,7 @@ export async function POST(request: NextRequest) {
         iban: sanitizeOptionalString(body.iban),
         bic: bicNormalizado ? bicNormalizado.replace(/\s+/g, '').toUpperCase() : null,
         puestoId: sanitizeOptionalString(body.puestoId),
-        jornadaId: jornadaPorDefecto.id, // Siempre tendrá una jornada (getOrCreateDefaultJornada garantiza que exista)
+        jornadaId, // null si hay asignación empresa/equipo, ID si es manual o individual
         fechaAlta: parseDateString(body.fechaAlta) ?? new Date(),
         tipoContrato: typeof body.tipoContrato === 'string' ? body.tipoContrato : 'indefinido',
         salarioBaseAnual,

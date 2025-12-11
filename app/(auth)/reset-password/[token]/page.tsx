@@ -8,6 +8,9 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { ResetPasswordForm } from './reset-password-form';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 interface ResetPasswordPageProps {
   params: Promise<{ token: string }>;
 }

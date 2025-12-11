@@ -150,6 +150,14 @@ function obtenerSalida(eventos: FichajeEventoDTO[]): FichajeEventoDTO | undefine
 /**
  * Agrupa los fichajes recibidos del API por jornada (día).
  * Devuelve los datos listos para ser renderizados en tablas o resúmenes.
+ *
+ * IMPORTANTE: Esta función asume que TODOS los fichajes pertenecen al MISMO empleado.
+ * El array de fichajes debe estar pre-filtrado por empleadoId antes de llamar a esta función.
+ * Si se necesita agrupar fichajes de múltiples empleados, usar una agrupación por empleado+fecha.
+ *
+ * @param fichajes - Array de fichajes de UN SOLO empleado (ya filtrados)
+ * @param options - Opciones de agrupación (horasObjetivo, etc.)
+ * @returns Array de jornadas agrupadas por fecha
  */
 export function agruparFichajesEnJornadas(
   fichajes: FichajeDTO[],

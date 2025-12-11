@@ -15,6 +15,9 @@ import { decimalToNumber } from '@/lib/utils';
 
 import { EmpleadoDetailClient } from './empleado-detail-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 interface EmpleadoDetailPageProps {
   params: Promise<{
     id: string;

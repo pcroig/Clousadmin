@@ -57,7 +57,7 @@ export function GestionarOnboardingModal({ open, onOpenChange }: GestionarOnboar
       setCargando(true);
       const response = await fetch('/api/onboarding/config');
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as { workflowAcciones?: WorkflowAccion[] };
         setAcciones(data.workflowAcciones || []);
       }
     } catch (error) {

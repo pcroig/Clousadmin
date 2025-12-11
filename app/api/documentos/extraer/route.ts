@@ -42,7 +42,7 @@ const fieldsToExtract = {
   nombre: 'Nombre',
   apellidos: 'Apellidos',
   email: 'Email',
-  nif: 'NIF/DNI/NIE',
+  nif: 'DNI/NIE',
   telefono: 'Teléfono (con prefijo internacional si está disponible)',
   fechaNacimiento: 'Fecha de nacimiento (formato YYYY-MM-DD)',
   direccionCalle: 'Dirección - Calle',

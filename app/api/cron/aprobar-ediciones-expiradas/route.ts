@@ -33,6 +33,9 @@ export async function GET(req: NextRequest) {
       },
       include: {
         notificacion: true,
+        fichaje: {
+          select: { id: true, estado: true },
+        },
       },
     });
 
@@ -41,15 +44,30 @@ export async function GET(req: NextRequest) {
     // Aprobar cada edición expirada
     for (const edicion of edicionesExpiradas) {
       try {
+        // CRÍTICO: No aprobar si el fichaje está rechazado
+        if (edicion.fichaje.estado === 'rechazado') {
+          console.log(`[CRON] Edición ${edicion.id} omitida: fichaje rechazado`);
+          continue;
+        }
+
         await prisma.$transaction(async (tx) => {
-          // Marcar edición como aprobada
-          await tx.ediciones_fichaje_pendientes.update({
-            where: { id: edicion.id },
+          // Marcar edición como aprobada (OPTIMISTIC LOCKING)
+          const updated = await tx.ediciones_fichaje_pendientes.updateMany({
+            where: {
+              id: edicion.id,
+              estado: 'pendiente', // Solo si aún está pendiente
+            },
             data: {
               estado: 'aprobado',
               aprobadoEn: ahora,
             },
           });
+
+          // Si count = 0, el empleado la rechazó justo antes → skip
+          if (updated.count === 0) {
+            console.log(`[CRON] Edición ${edicion.id} ya fue procesada, omitiendo`);
+            return;
+          }
 
           // Marcar notificación como leída
           await tx.notificaciones.update({

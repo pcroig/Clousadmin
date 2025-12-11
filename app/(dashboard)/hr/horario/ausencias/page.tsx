@@ -10,6 +10,9 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { AusenciasClient } from './ausencias-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function AusenciasPage(props: {
   searchParams: Promise<{ panel?: string }>;

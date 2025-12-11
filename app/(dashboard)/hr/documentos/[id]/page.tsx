@@ -11,6 +11,9 @@ import { prisma } from '@/lib/prisma';
 
 import { CarpetaDetailClient } from './carpeta-detail-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function HRCarpetaDetailPage(context: { params: Promise<{ id: string }> }) {
     const params = await context.params;

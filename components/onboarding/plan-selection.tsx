@@ -45,7 +45,7 @@ export function PlanSelection({
     async function loadProducts() {
       try {
         const response = await fetch('/api/billing/products');
-        const data = await response.json();
+        const data = await response.json() as { products?: Array<unknown>; error?: string };
 
         if (!response.ok) {
           throw new Error(data.error || 'Error al cargar planes');
@@ -70,7 +70,7 @@ export function PlanSelection({
         body: JSON.stringify({ priceId }),
       });
 
-      const data = await response.json();
+      const data = await response.json() as { url?: string; error?: string };
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al iniciar el pago');

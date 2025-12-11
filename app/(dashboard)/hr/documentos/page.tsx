@@ -12,6 +12,9 @@ import { prisma } from '@/lib/prisma';
 
 import { DocumentosClient } from './documentos-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function DocumentosPage() {
   const session = await getSession();

@@ -11,6 +11,9 @@ import { prisma } from '@/lib/prisma';
 
 import { PlantillaDetailClient } from './plantilla-detail-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function PlantillaDetailPage(context: { params: Promise<{ id: string }> }) {
     const params = await context.params;

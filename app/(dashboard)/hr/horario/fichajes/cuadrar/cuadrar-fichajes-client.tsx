@@ -168,7 +168,8 @@ export function CuadrarFichajesClient() {
         params.append('search', busquedaEmpleado);
       }
 
-      const response = await fetch(`/api/fichajes/revision?${params.toString()}`);
+      // FASE 7: Usar nuevo endpoint GET /api/fichajes/cuadrar con eventos propuestos pre-calculados
+      const response = await fetch(`/api/fichajes/cuadrar?${params.toString()}`);
 
       if (!response.ok) {
         const errorText = await response.text();

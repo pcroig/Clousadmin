@@ -52,48 +52,67 @@ function simularCambios(
   eventosOriginales: Array<{ id: string; tipo: string; hora: Date }>,
   cambios: z.infer<typeof cambioEventoSchema>[]
 ): Array<{ tipo: string; hora: Date }> {
-  let eventosSimulados = [...eventosOriginales];
+  // Crear un mapa para acceso rápido por ID
+  const eventosMap = new Map(eventosOriginales.map(e => [e.id, { ...e }]));
 
+  // IDs de eventos a eliminar
+  const idsAEliminar = new Set<string>();
+
+  // Eventos nuevos a crear
+  const eventosNuevos: Array<{ id: string; tipo: string; hora: Date }> = [];
+
+  // Procesar cambios
   for (const cambio of cambios) {
     if (cambio.accion === 'crear') {
-      eventosSimulados.push({
-        id: 'temp',
+      eventosNuevos.push({
+        id: `temp_${eventosNuevos.length}`,
         tipo: cambio.tipo,
         hora: new Date(cambio.hora),
       });
     } else if (cambio.accion === 'editar') {
-      const index = eventosSimulados.findIndex(e => e.id === cambio.eventoId);
-      if (index !== -1) {
-        eventosSimulados[index] = {
-          ...eventosSimulados[index],
-          tipo: cambio.tipo ?? eventosSimulados[index].tipo,
-          hora: cambio.hora ? new Date(cambio.hora) : eventosSimulados[index].hora,
-        };
+      const evento = eventosMap.get(cambio.eventoId);
+      if (evento) {
+        evento.tipo = cambio.tipo ?? evento.tipo;
+        evento.hora = cambio.hora ? new Date(cambio.hora) : evento.hora;
       }
     } else if (cambio.accion === 'eliminar') {
-      eventosSimulados = eventosSimulados.filter(e => e.id !== cambio.eventoId);
+      idsAEliminar.add(cambio.eventoId);
     }
   }
 
-  // Ordenar por hora
-  return eventosSimulados
+  // Combinar eventos: originales (editados y no eliminados) + nuevos
+  const eventosCombinados = [
+    ...Array.from(eventosMap.values()).filter(e => !idsAEliminar.has(e.id)),
+    ...eventosNuevos
+  ];
+
+  // Ordenar por hora y retornar solo tipo y hora
+  return eventosCombinados
     .sort((a, b) => a.hora.getTime() - b.hora.getTime())
     .map(e => ({ tipo: e.tipo, hora: e.hora }));
 }
 
 // Helper: Validar secuencia de eventos
 function validarSecuenciaEventos(eventos: Array<{ tipo: string; hora: Date }>): { valido: boolean; error?: string } {
+  if (eventos.length === 0) {
+    return { valido: true }; // Fichaje vacío es válido
+  }
+
   let estadoEsperado = 'sin_fichar';
 
   for (let i = 0; i < eventos.length; i++) {
     const evento = eventos[i];
     const anterior = eventos[i - 1];
 
+    // Formatear hora para mensajes de error
+    const horaFormateada = evento.hora.toTimeString().substring(0, 5);
+    const horaAnteriorFormateada = anterior ? anterior.hora.toTimeString().substring(0, 5) : '';
+
     // Validar que la hora sea posterior al evento anterior
     if (anterior && evento.hora < anterior.hora) {
       return {
         valido: false,
-        error: `El evento ${evento.tipo} tiene una hora anterior al evento ${anterior.tipo}`,
+        error: `El evento "${evento.tipo}" a las ${horaFormateada} tiene una hora anterior al evento "${anterior.tipo}" a las ${horaAnteriorFormateada}`,
       };
     }
 
@@ -101,34 +120,47 @@ function validarSecuenciaEventos(eventos: Array<{ tipo: string; hora: Date }>): 
     switch (evento.tipo) {
       case 'entrada':
         if (estadoEsperado !== 'sin_fichar' && estadoEsperado !== 'finalizado') {
-          return { valido: false, error: 'Ya existe una entrada activa' };
+          return {
+            valido: false,
+            error: `No se puede registrar "entrada" a las ${horaFormateada}: ya existe una entrada activa (evento ${i + 1} de ${eventos.length})`
+          };
         }
         estadoEsperado = 'trabajando';
         break;
 
       case 'pausa_inicio':
         if (estadoEsperado !== 'trabajando') {
-          return { valido: false, error: 'Debe haber una entrada antes de iniciar pausa' };
+          const eventosAnteriores = eventos.slice(0, i).map(e => `${e.tipo} (${e.hora.toTimeString().substring(0, 5)})`).join(', ');
+          return {
+            valido: false,
+            error: `No se puede iniciar pausa a las ${horaFormateada}: debe haber una entrada antes. Eventos anteriores: ${eventosAnteriores || 'ninguno'}`
+          };
         }
         estadoEsperado = 'en_pausa';
         break;
 
       case 'pausa_fin':
         if (estadoEsperado !== 'en_pausa') {
-          return { valido: false, error: 'Debe haber inicio de pausa antes de reanudar' };
+          return {
+            valido: false,
+            error: `No se puede finalizar pausa a las ${horaFormateada}: debe haber un inicio de pausa antes (evento ${i + 1} de ${eventos.length})`
+          };
         }
         estadoEsperado = 'trabajando';
         break;
 
       case 'salida':
         if (estadoEsperado === 'sin_fichar' || estadoEsperado === 'finalizado') {
-          return { valido: false, error: 'No hay jornada iniciada para finalizar' };
+          return {
+            valido: false,
+            error: `No se puede registrar "salida" a las ${horaFormateada}: no hay jornada iniciada (evento ${i + 1} de ${eventos.length})`
+          };
         }
         estadoEsperado = 'finalizado';
         break;
 
       default:
-        return { valido: false, error: `Tipo de evento inválido: ${evento.tipo}` };
+        return { valido: false, error: `Tipo de evento inválido: "${evento.tipo}"` };
     }
   }
 
@@ -172,36 +204,55 @@ export async function POST(req: NextRequest) {
       return notFoundResponse('Fichaje no encontrado');
     }
 
+    // CRÍTICO: Validar que el fichaje NO esté rechazado
+    if (fichaje.estado === 'rechazado') {
+      return badRequestResponse('Este fichaje fue rechazado y no se puede editar');
+    }
+
     // CRÍTICO: No permitir editar fichajes propios
     if (session.user.empleadoId === fichaje.empleadoId) {
       return forbiddenResponse('No puedes editar tus propios fichajes');
     }
 
-    // CRÍTICO: Verificar que no haya edición pendiente de aprobación
-    const edicionPendiente = await prisma.ediciones_fichaje_pendientes.findFirst({
-      where: {
-        fichajeId,
-        estado: 'pendiente',
-      },
-    });
-
-    if (edicionPendiente) {
-      return badRequestResponse(
-        'Este fichaje ya tiene una edición pendiente de aprobación. ' +
-        'Espera a que el empleado la apruebe o rechace (o que expire en 48h) antes de editarlo nuevamente.'
-      );
-    }
-
-    // 4. Simular cambios y validar secuencia
+    // 4. Simular cambios y validar secuencia (ANTES de transacción para fail-fast)
     const eventosSimulados = simularCambios(fichaje.eventos, cambios);
     const validacion = validarSecuenciaEventos(eventosSimulados);
 
     if (!validacion.valido) {
+      // Log detallado para debugging
+      console.error('[API Editar-Batch] Validación de secuencia falló:', {
+        error: validacion.error,
+        eventosOriginales: fichaje.eventos.map(e => ({
+          id: e.id,
+          tipo: e.tipo,
+          hora: e.hora.toISOString(),
+        })),
+        cambiosRecibidos: cambios,
+        eventosSimulados: eventosSimulados.map(e => ({
+          tipo: e.tipo,
+          hora: e.hora.toISOString(),
+        })),
+      });
+
       return badRequestResponse(validacion.error || 'Secuencia de eventos inválida');
     }
 
     // 5. Aplicar cambios en TRANSACCIÓN
     const resultado = await prisma.$transaction(async (tx) => {
+      // CRÍTICO: Verificar edición pendiente DENTRO de transacción (previene race condition)
+      const edicionPendiente = await tx.ediciones_fichaje_pendientes.findFirst({
+        where: {
+          fichajeId,
+          estado: 'pendiente',
+        },
+      });
+
+      if (edicionPendiente) {
+        throw new Error(
+          'Este fichaje ya tiene una edición pendiente de aprobación. ' +
+          'Espera a que el empleado la apruebe o rechace (o que expire en 48h) antes de editarlo nuevamente.'
+        );
+      }
       const cambiosAplicados: any[] = [];
 
       // Procesar cada cambio
@@ -336,49 +387,57 @@ export async function POST(req: NextRequest) {
       });
       const nombreEditor = editor ? `${editor.nombre} ${editor.apellidos}` : 'Administrador';
 
-      // 8. Obtener usuario del empleado
+      // 8. Obtener usuario del empleado (puede ser null si no tiene acceso)
       const usuarioEmpleado = await tx.usuarios.findUnique({
         where: { empleadoId: fichaje.empleadoId },
         select: { id: true },
       });
 
-      if (!usuarioEmpleado) {
-        throw new Error('Usuario del empleado no encontrado');
+      // 9. Crear notificación y edición pendiente SOLO si el empleado tiene usuario
+      let notificacionId: string | null = null;
+
+      if (usuarioEmpleado) {
+        // 9a. Crear notificación especial con botón de rechazo
+        const notificacion = await tx.notificaciones.create({
+          data: {
+            empresaId: session.user.empresaId,
+            usuarioId: usuarioEmpleado.id,
+            tipo: 'fichaje_editado_batch',
+            prioridad: 'alta',
+            mensaje: `${nombreEditor} ha editado tu fichaje del ${format(fichaje.fecha, 'dd/MM/yyyy')}. Motivo: ${motivo}`,
+            enlace: '/empleado/horario/fichajes',
+            textoBoton: 'Ver cambios',
+            accionBoton: 'rechazar_edicion',
+            leida: false,
+          },
+        });
+        notificacionId = notificacion.id;
+
+        // 9b. Crear registro de edición pendiente (48h para rechazar)
+        const expiraEn = new Date();
+        expiraEn.setHours(expiraEn.getHours() + 48);
+
+        await tx.ediciones_fichaje_pendientes.create({
+          data: {
+            fichajeId,
+            empresaId: session.user.empresaId,
+            empleadoId: fichaje.empleadoId,
+            editadoPor: empleadoIdEditor,
+            notificacionId: notificacion.id,
+            cambios: cambiosAplicados,
+            estado: 'pendiente',
+            expiraEn,
+          },
+        });
+      } else {
+        // 9c. Empleado sin usuario: cambios se aplican directamente sin notificación
+        console.warn(
+          `[API Editar-Batch] Empleado ${fichaje.empleadoId} no tiene usuario. ` +
+          `Cambios aplicados sin notificación ni ventana de rechazo.`
+        );
       }
 
-      // 9. Crear notificación especial con botón de rechazo
-      const notificacion = await tx.notificaciones.create({
-        data: {
-          empresaId: session.user.empresaId,
-          usuarioId: usuarioEmpleado.id,
-          tipo: 'fichaje_editado_batch',
-          prioridad: 'alta',
-          mensaje: `${nombreEditor} ha editado tu fichaje del ${format(fichaje.fecha, 'dd/MM/yyyy')}. Motivo: ${motivo}`,
-          enlace: '/empleado/horario/fichajes',
-          textoBoton: 'Ver cambios',
-          accionBoton: 'rechazar_edicion',
-          leida: false,
-        },
-      });
-
-      // 10. Crear registro de edición pendiente (48h para rechazar)
-      const expiraEn = new Date();
-      expiraEn.setHours(expiraEn.getHours() + 48);
-
-      await tx.ediciones_fichaje_pendientes.create({
-        data: {
-          fichajeId,
-          empresaId: session.user.empresaId,
-          empleadoId: fichaje.empleadoId,
-          editadoPor: empleadoIdEditor,
-          notificacionId: notificacion.id,
-          cambios: cambiosAplicados,
-          estado: 'pendiente',
-          expiraEn,
-        },
-      });
-
-      return { success: true, notificacionId: notificacion.id };
+      return { success: true, notificacionId };
     });
 
     return successResponse(resultado);

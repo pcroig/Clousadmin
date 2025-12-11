@@ -25,6 +25,9 @@ import { ensureDate } from '@/lib/utils/fechas';
 import type { TipoNotificacion } from '@/lib/notificaciones';
 import type { NotificacionUI } from '@/types/Notificacion';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 export default async function HRDashboardPage() {
   const session = await getSession();
 

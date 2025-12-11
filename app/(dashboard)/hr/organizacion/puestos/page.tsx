@@ -10,6 +10,9 @@ import { prisma } from '@/lib/prisma';
 
 import { PuestosClient } from './puestos-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function PuestosPage() {
   const session = await getSession();

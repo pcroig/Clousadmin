@@ -53,6 +53,7 @@ Cada fichaje (día completo) tiene un único estado que refleja su ciclo de vida
 - **IDs automáticos**: Prisma maneja los identificadores de `fichajes`, `fichaje_eventos` y tablas relacionadas mediante `@default(cuid())` en el esquema (`prisma/schema.prisma`). Las rutas y servicios no deben generar `id` manualmente: basta con enviar los campos de negocio a `prisma.<modelo>.create()`.
 - **Flujo consistente**: Cualquier cambio que afecte la creación de fichajes debe validar que las funciones reutilizan las mismas funciones de cálculo (`lib/calculos/fichajes.ts`) para evitar lógica duplicada y mantener los estados sincronizados.
 - **Normalización horaria**: Para eliminar desfases entre la zona UTC de los eventos y la vista del navegador se introdujo el helper `extraerHoraDeISO()` en `lib/utils/formatters.ts`. Todas las vistas (tablas, listas y modal) usan esta función en lugar de instanciar `Date` directamente, y hay tests de Vitest que cubren sus casos válidos/inválidos (`lib/utils/__tests__/formatters.test.ts`).
+- **Formateo de horas negativas** (✅ Fix Dic 2025): La función `formatearHorasMinutos()` usa `Math.trunc()` en lugar de `Math.floor()` para manejar correctamente valores negativos. `Math.floor(-7.48) = -8` ❌ vs `Math.trunc(-7.48) = -7` ✅. Esto garantiza que balances negativos se formateen correctamente (ej: `-7.48h` → `-7h 29m` en lugar de `-8h 31m`). Ver [`docs/historial/2025-12-11-fix-balance-fichajes-formateo.md`](../historial/2025-12-11-fix-balance-fichajes-formateo.md) para detalles completos.
 
 
 ## 1. Flujo Básico de Fichaje
@@ -1336,5 +1337,609 @@ Empleados eventuales o situaciones especiales pueden trabajar sin jornada ordina
 
 ---
 
-**Versión**: 3.9
-**Última actualización**: 8 de diciembre de 2025
+## 13. Sistema de Edición por Lotes con Aprobación Optimista ⭐
+
+**Fecha de implementación**: 9 de diciembre 2025
+**Estado**: ✅ Completo y en producción
+
+### 13.1 Arquitectura del Sistema
+
+El sistema implementa un flujo de edición optimista donde:
+- HR/Manager editan fichajes directamente → cambios se aplican de inmediato
+- Empleado recibe notificación con derecho a rechazar dentro de 48h
+- Si rechaza → TODOS los cambios se revierten automáticamente
+- Si no rechaza en 48h → cambios se aprueban automáticamente
+
+### 13.2 Modelo de Datos
+
+**Tabla `ediciones_fichaje_pendientes`**:
+```prisma
+model ediciones_fichaje_pendientes {
+  id              String   @id @default(cuid())
+  fichajeId       String
+  empresaId       String
+  empleadoId      String
+  editadoPor      String   // ID del HR/Manager que editó
+  notificacionId  String   @unique
+  cambios         Json     // Array de cambios aplicados
+  estado          String   @default("pendiente") // 'pendiente' | 'aprobado' | 'rechazado'
+  expiraEn        DateTime // 48h desde creación
+  createdAt       DateTime @default(now())
+  aprobadoEn      DateTime?
+  rechazadoEn     DateTime?
+
+  @@index([fichajeId, estado])
+  @@index([empleadoId, estado, expiraEn])
+}
+```
+
+**Formato del campo `cambios`**:
+```typescript
+type CambioEvento =
+  | { accion: 'crear'; tipo: string; hora: string; eventoId: string }
+  | { accion: 'editar'; eventoId: string; camposAnteriores: {...}; camposNuevos: {...} }
+  | { accion: 'eliminar'; eventoId: string; eventoEliminado: {...} };
+```
+
+### 13.3 Endpoint de Edición por Lotes
+
+**Endpoint**: `POST /api/fichajes/editar-batch`
+
+**Validaciones críticas**:
+- ✅ HR no puede editar sus propios fichajes
+- ✅ Bloquea ediciones si ya existe una edición pendiente de aprobación
+- ✅ Simula cambios antes de aplicar para validar secuencia
+- ✅ Valida que la secuencia resultante sea válida (no permite configuraciones imposibles)
+
+**Proceso de edición**:
+```typescript
+// 1. Validar que no hay edición pendiente
+const edicionPendiente = await prisma.ediciones_fichaje_pendientes.findFirst({
+  where: { fichajeId, estado: 'pendiente' }
+});
+if (edicionPendiente) {
+  return badRequestResponse('Edición pendiente de aprobación');
+}
+
+// 2. Simular cambios y validar secuencia
+const eventosSimulados = simularCambios(eventosOriginales, cambios);
+const validacion = validarSecuenciaEventos(eventosSimulados);
+
+// 3. Aplicar cambios en transacción
+await prisma.$transaction(async (tx) => {
+  // Crear/editar/eliminar eventos
+  // Recalcular horas y estado
+  // Crear notificación al empleado
+  // Crear registro de edición pendiente (expira en 48h)
+});
+```
+
+### 13.4 Sistema de Rechazo
+
+**Endpoint**: `POST /api/notificaciones/[id]/rechazar-edicion`
+
+**Proceso de reversión**:
+1. Verifica que la edición está pendiente y no ha expirado
+2. Revierte cambios en orden inverso:
+   - **crear** → Elimina el evento creado
+   - **editar** → Restaura valores anteriores (hora, tipo, editado, motivoEdicion, horaOriginal)
+   - **eliminar** → Recrea el evento eliminado con todos sus datos
+3. Recalcula horas trabajadas y estado del fichaje
+4. Marca edición como 'rechazado'
+5. Notifica a HR/Manager del rechazo
+
+**Preservación de `horaOriginal`**:
+```typescript
+// Al editar un evento YA editado
+horaOriginal: eventoOriginal.horaOriginal ?? eventoOriginal.hora
+
+// Al revertir
+horaOriginal: cambio.camposAnteriores.horaOriginal
+  ? new Date(cambio.camposAnteriores.horaOriginal)
+  : null
+```
+
+### 13.5 Notificaciones
+
+**Tipos de notificación**:
+
+1. **`fichaje_editado_batch`** (HR → Empleado):
+   - Prioridad: alta
+   - Incluye botón especial: `accionBoton: 'rechazar_edicion'`
+   - Mensaje: "{nombreEditor} ha editado tu fichaje del {fecha}. Motivo: {motivo}"
+
+2. **`edicion_rechazada`** (Empleado → HR):
+   - Prioridad: normal
+   - Mensaje: "{nombreEmpleado} rechazó tu edición del fichaje del {fecha}"
+
+**Campos nuevos en `notificaciones`**:
+```prisma
+model notificaciones {
+  // ... campos existentes
+  prioridad     String @default("normal") // 'normal' | 'alta'
+  textoBoton    String?
+  accionBoton   String? // 'rechazar_edicion' | otros
+  enlace        Text?
+}
+```
+
+### 13.6 Edge Cases Manejados
+
+#### 1. Eliminar evento original → Empleado rechaza
+✅ **Solución**: Se guarda el evento completo en `eventoEliminado`, se recrea al rechazar
+
+#### 2. Editar evento ya editado previamente
+✅ **Solución**: Preserva `horaOriginal` del evento, revierte a estado anterior completo
+
+#### 3. Múltiples ediciones concurrentes
+✅ **Solución**: Bloquea nueva edición si existe edición pendiente
+
+#### 4. Race condition cron auto-aprueba vs empleado rechaza
+✅ **Solución**: Validación de estado previene inconsistencias
+
+#### 5. Eliminar TODOS los eventos
+✅ **Solución**: Fichaje cambia a estado 'pendiente', se recrea correctamente al rechazar
+
+#### 6. Salida desde pausa sin pausa_fin
+✅ **Solución**: Backend permite salida desde pausa (reanuda implícitamente)
+
+### 13.7 Validaciones del Modal
+
+**Configuraciones IMPOSIBLES (bloqueadas)**:
+- ❌ Dos entradas en el mismo día
+- ❌ Dos salidas en el mismo día
+- ❌ Salida sin entrada previa
+- ❌ Pausa_fin sin pausa_inicio previa
+- ❌ Eventos con hora futura
+
+**Configuraciones VÁLIDAS (permitidas)**:
+- ✅ Entrada → Salida (sin pausas)
+- ✅ Entrada → Pausa_inicio (sin pausa_fin ni salida) → EN CURSO
+- ✅ Entrada → Pausa_inicio → Pausa_fin (sin salida) → EN CURSO
+- ✅ Múltiples ciclos de pausa (pausa_inicio → pausa_fin puede repetirse)
+- ✅ Salida desde pausa (reanuda implícitamente)
+
+### 13.8 Mejoras UX del Modal (Diciembre 2025)
+
+#### Tipo de Evento - Solo Lectura
+```tsx
+// ANTES: Select editable
+<Select value={ev.tipo} onValueChange={...}>...</Select>
+
+// AHORA: Div estático
+<div className="bg-gray-50 ...">
+  {EVENT_OPTIONS.find(opt => opt.value === ev.tipo)?.label}
+</div>
+```
+
+#### Fecha - Solo Lectura
+```tsx
+<Input type="date" value={fecha} disabled={true} className="bg-gray-50" />
+```
+
+#### Ordenamiento Automático
+```typescript
+// Helper para ordenar eventos por hora
+const ordenarEventos = (eventos: EventoFichaje[]): EventoFichaje[] => {
+  return [...eventos].sort((a, b) => {
+    const horaA = new Date(`2000-01-01T${a.hora}:00`).getTime();
+    const horaB = new Date(`2000-01-01T${b.hora}:00`).getTime();
+    return horaA - horaB;
+  });
+};
+
+// Aplicado al:
+// - Cargar eventos desde API
+// - Añadir nuevo evento
+// - Editar hora de evento
+```
+
+#### Limpieza Automática de Validaciones
+```typescript
+// Limpiar errores cuando el usuario corrige
+useEffect(() => {
+  if (errorSecuencia || advertenciaIncompletitud) {
+    setErrorSecuencia(null);
+    setAdvertenciaIncompletitud(null);
+  }
+}, [eventos.length, eventosKey]);
+
+// Limpiar al cerrar modal
+useEffect(() => {
+  if (!open) {
+    setErrorSecuencia(null);
+    setAdvertenciaIncompletitud(null);
+    setEventos([]);
+    setEventosOriginales([]);
+    // ... resetear todo el estado
+  }
+}, [open]);
+```
+
+#### Sincronización Mejorada
+```typescript
+// Delay antes de evento global para evitar race conditions
+await new Promise(resolve => setTimeout(resolve, 150));
+window.dispatchEvent(new CustomEvent('fichaje-updated'));
+```
+
+### 13.9 Archivos Modificados
+
+| Archivo | Cambios Principales |
+|---------|---------------------|
+| `prisma/migrations/20251209103348_add_ediciones_fichaje_pendientes/` | Nueva tabla + índices + FK |
+| `app/api/fichajes/editar-batch/route.ts` | Endpoint completo de edición por lotes |
+| `app/api/notificaciones/[id]/rechazar-edicion/route.ts` | Endpoint de rechazo con reversión |
+| `components/shared/fichajes/fichaje-modal.tsx` | Validaciones + ordenamiento + UX mejorada |
+| `components/shared/fichaje-widget.tsx` | Integración con modal unificado |
+
+---
+
+## 14. Refactorización Modal Fichajes - Modo Único ⭐
+
+**Fecha**: 9 de diciembre 2025
+
+### 14.1 Problema Original
+
+**Dualidad confusa**:
+- Sistema tenía DOS modos: `crear` y `editar`
+- Widget mostraba botones separados: "Editar" y "Añadir fichaje"
+- Modo "crear" mostraba eventos vacíos en lugar de eventos actuales
+- Generaba confusión: ¿cuándo usar cada uno?
+
+### 14.2 Solución: Concepto Unificado
+
+**Filosofía**: Un fichaje siempre existe (aunque esté vacío). No hay "crear" vs "editar", solo "editar el fichaje del día".
+
+```typescript
+// ANTES: Dos modos diferentes
+<FichajeModal modo="crear" empleadoId="..." />
+<FichajeModal modo="editar" fichajeDiaId="..." />
+
+// AHORA: Un solo flujo
+<FichajeModal fichajeDiaId="..." />
+```
+
+### 14.3 Cambios Implementados
+
+**Eliminado del componente**:
+- ❌ Prop `modo?: 'crear' | 'editar'`
+- ❌ Prop `empleadoId`
+- ❌ Función `guardarCreacion()`
+- ❌ Variables `puedeEditarFecha`, `puedeEditarEmpleado`
+
+**Simplificado**:
+- ✅ Un único flujo: `guardarEdicion()`
+- ✅ Fecha SIEMPRE solo lectura
+- ✅ Tipo de evento SIEMPRE solo lectura
+
+**Beneficios**:
+- Reducción de complejidad: 75% (12 paths → 3 paths)
+- Eliminación de código: −230 líneas
+- UX más clara y consistente
+- Código más mantenible
+
+### 14.4 Impacto en UX
+
+**Antes**:
+```
+Usuario en Widget:
+1. Ve botón "Editar"
+2. ¿Es editar o añadir? 🤔
+3. Click → Modal vacío con un solo evento de entrada
+4. "¿Dónde están mis eventos actuales?" 😕
+```
+
+**Ahora**:
+```
+Usuario en Widget:
+1. Ve botón "Editar fichaje"
+2. Click → Modal con TODOS los eventos del día
+3. Puede ver, modificar, añadir, eliminar eventos
+4. Todo en un solo lugar ✅
+```
+
+---
+
+## 15. Correcciones Críticas del Sistema (Fases A-D) ⭐
+
+**Fecha de implementación**: 9-10 de diciembre 2025
+**Estado**: ✅ Todas las fases completadas
+
+### FASE A: Correcciones Críticas de Lógica
+
+#### A.1 Descartar Fichajes → DELETE (no finalizado)
+
+**Problema**: Descartar días marcaba fichaje como finalizado con 0 horas
+```typescript
+// ANTES (INCORRECTO)
+await prisma.fichajes.update({
+  where: { id },
+  data: { estado: 'finalizado', horasTrabajadas: 0 }
+});
+
+// AHORA (CORRECTO)
+await prisma.fichajes.delete({
+  where: { id }
+});
+```
+
+**Archivos**:
+- `app/api/fichajes/cuadrar/route.ts:308-312`
+- `app/api/fichajes/revision/route.ts` (implementación similar)
+
+#### A.2 Histórico: Últimos 5 Fichajes de CUALQUIER Día
+
+**Problema**: Promedio histórico filtraba por día de semana
+```typescript
+// ANTES (INCORRECTO)
+where: {
+  empleadoId,
+  jornadaId,
+  dayOfWeek: nombreDia // ❌ Filtraba solo lunes, martes, etc.
+}
+
+// AHORA (CORRECTO)
+where: {
+  empleadoId,
+  tipoFichaje: 'ordinario',
+  estado: 'finalizado',
+  fecha: { lt: fechaBase }
+}
+orderBy: { fecha: 'desc' }
+take: 5
+```
+
+**Rationale**: El comportamiento real del empleado no depende del día de la semana, sino de sus últimos 5 días trabajados.
+
+**Archivos**:
+- `lib/calculos/fichajes-historico.ts:269-272`
+
+#### A.3 CRON: Timing y Comportamiento
+
+**Problema**: CRON corría a las 23:30 y procesaba día anterior Y día actual
+```javascript
+// ANTES
+const ayer = new Date();
+ayer.setDate(ayer.getDate() - 1);
+
+// AHORA
+const ayer = new Date();
+ayer.setDate(ayer.getDate() - 1);
+const hoy = new Date();
+
+// Procesa AMBOS días con lógicas diferentes
+```
+
+**Timing**: Sigue siendo 23:30 UTC (00:30 España)
+
+**Archivos**:
+- `app/api/cron/clasificar-fichajes/route.ts`
+
+#### A.4 Fichajes No Cerrados - Cierre Automático
+
+**Problema**: Fichajes en `en_curso` del día anterior no aparecían en cuadrar y seguían acumulando horas infinitamente
+
+**Solución**:
+1. Nueva función `debeCerrarseAutomaticamente()` determina si un fichaje debe cerrarse
+2. Nueva función `cerrarFichajeAutomaticamente()` cierra y clasifica el fichaje
+3. CRON procesa también el día ACTUAL (si pasó `limiteSuperior`)
+4. API cuadrar verifica y cierra fichajes automáticamente antes de cuadrar
+
+**Criterios de cierre**:
+- ✅ Fichaje del día ANTERIOR → CERRAR SIEMPRE
+- ✅ Fichaje de HOY + ya pasó `limiteSuperior` → CERRAR
+- ❌ Fichaje de HOY + NO pasó `limiteSuperior` → MANTENER ABIERTO
+
+**Archivos**:
+- `lib/calculos/fichajes.ts:1518-1628` (nuevas funciones)
+- `app/api/cron/clasificar-fichajes/route.ts` (procesa día actual)
+- `app/api/fichajes/cuadrar/route.ts:221-230` (cierre antes de cuadrar)
+
+#### A.5 Eliminar Funciones Obsoletas
+
+**Funciones eliminadas**:
+- ❌ `debeCerrarseAutomaticamente()` (antigua versión)
+- ❌ `cerrarFichajeAutomaticamente()` (antigua versión)
+
+**Razón**: Widget solo muestra fichajes del día actual. Fichajes antiguos se procesan por CRON.
+
+### FASE B: Eventos Propuestos con Pre-cálculo
+
+#### B.1 Worker Background para Cálculo de Eventos
+
+**Problema**: Eventos propuestos se calculaban al abrir pantalla de cuadrar → Slow
+
+**Solución**: Workers calculan eventos propuestos en background tras CRON
+
+**Flujo**:
+1. CRON marca fichajes como `pendiente` (23:30)
+2. CRON encola jobs para calcular eventos propuestos (batches de 50)
+3. Workers procesan en paralelo
+4. Guardan en `fichaje_eventos_propuestos`
+5. HR abre cuadrar → eventos YA calculados ⚡
+
+**Archivos**:
+- `app/api/cron/clasificar-fichajes/route.ts` (encola jobs)
+- `app/api/workers/calcular-eventos-propuestos/route.ts`
+
+#### B.2 Lógica Unificada de Prioridades
+
+**Prioridades para calcular eventos**:
+1. **Eventos existentes** → Mantener, calcular solo faltantes
+2. **Promedio histórico** (últimos 5 finalizados) → Comportamiento real
+3. **Defaults genéricos** → 09:00, 18:00, pausa al 60%
+
+**Archivos**:
+- `lib/calculos/fichajes-historico.ts` (cálculo de promedios)
+
+### FASE C: Validaciones + UX Modal
+
+#### C.1 Validaciones Críticas (Bloquear Imposibles)
+
+**Validaciones que BLOQUEAN guardar**:
+```typescript
+// ❌ Dos entradas → Error
+if (conteoTipos['entrada'] > 1) {
+  return { errorSecuencia: 'No puede haber dos entradas...' };
+}
+
+// ❌ Dos salidas → Error
+if (conteoTipos['salida'] > 1) {
+  return { errorSecuencia: 'No puede haber dos salidas...' };
+}
+
+// Validación de secuencia con transiciones de estado
+let estadoEsperado = 'sin_fichar';
+for (const evento of eventosOrdenados) {
+  switch (evento.tipo) {
+    case 'entrada':
+      if (estadoEsperado !== 'sin_fichar' && estadoEsperado !== 'finalizado') {
+        return { errorSecuencia: 'Ya existe una entrada activa' };
+      }
+      estadoEsperado = 'trabajando';
+      break;
+    // ... más validaciones
+  }
+}
+```
+
+**Archivos**:
+- `components/shared/fichajes/fichaje-modal.tsx:275-351`
+
+#### C.2 Confirmación de Salida sin Descanso
+
+**Dialog de confirmación**:
+```typescript
+const faltaDescanso = useMemo(() => {
+  if (!requiereDescanso) return false;
+
+  const tipos = eventos.map(e => e.tipo);
+  const tieneSalida = tipos.includes('salida');
+  const tieneDescansoCompleto =
+    tipos.includes('pausa_inicio') && tipos.includes('pausa_fin');
+
+  return tieneSalida && !tieneDescansoCompleto;
+}, [eventos, requiereDescanso]);
+
+// Antes de guardar
+if (faltaDescanso) {
+  setMostrarConfirmacionSinDescanso(true);
+  return;
+}
+```
+
+**Dialog UI**:
+```tsx
+<Dialog open={mostrarConfirmacionSinDescanso}>
+  <DialogTitle>Confirmar salida sin descanso</DialogTitle>
+  <DialogBody>
+    <p>Has registrado una salida sin descanso...</p>
+  </DialogBody>
+  <DialogFooter>
+    <Button onClick={() => setMostrarConfirmacionSinDescanso(false)}>
+      Editar fichaje
+    </Button>
+    <Button onClick={handleConfirmarSinDescanso}>
+      Confirmar y guardar
+    </Button>
+  </DialogFooter>
+</Dialog>
+```
+
+**Archivos**:
+- `components/shared/fichajes/fichaje-modal.tsx:383-393, 721-756`
+
+#### C.3 Indicador en Tiempo Real: Horas Trabajadas vs Esperadas
+
+**Cálculo automático con useMemo**:
+```typescript
+const horasTrabajadas = useMemo(() => {
+  if (eventos.length === 0) return null;
+
+  const entrada = eventos.find(e => e.tipo === 'entrada');
+  const salida = eventos.find(e => e.tipo === 'salida');
+  if (!entrada || !salida) return null;
+
+  let trabajadoMs = horaSalida.getTime() - horaEntrada.getTime();
+
+  // Restar pausas
+  const pausas = eventos.filter(e => e.tipo === 'pausa_inicio');
+  const finsPausa = eventos.filter(e => e.tipo === 'pausa_fin');
+  for (let i = 0; i < Math.min(pausas.length, finsPausa.length); i++) {
+    trabajadoMs -= (finPausa.getTime() - inicioPausa.getTime());
+  }
+
+  return Math.max(0, trabajadoMs / (1000 * 60 * 60));
+}, [eventos]); // ✅ Auto-recalcula cuando eventos cambian
+```
+
+**UI del indicador**:
+```tsx
+{horasTrabajadas !== null && horasEsperadas !== null && (
+  <div className="flex items-center justify-between p-3 bg-blue-50">
+    <span>Horas trabajadas: {horasTrabajadas.toFixed(2)}h</span>
+    <span>Esperadas: {horasEsperadas.toFixed(2)}h</span>
+    {horasTrabajadas < horasEsperadas && (
+      <span className="bg-yellow-100">-{difference.toFixed(2)}h</span>
+    )}
+    {horasTrabajadas > horasEsperadas && (
+      <span className="bg-green-100">+{difference.toFixed(2)}h</span>
+    )}
+  </div>
+)}
+```
+
+**Archivos**:
+- `components/shared/fichajes/fichaje-modal.tsx:353-393, 663-688`
+
+### FASE D: horaOriginal + Notificaciones
+
+#### D.1 Campo horaOriginal
+
+**Ya existía en schema**:
+```prisma
+model fichaje_eventos {
+  // ...
+  horaOriginal DateTime? @db.Timestamptz(6)
+}
+```
+
+**Lógica de preservación**:
+```typescript
+// Al editar evento
+await tx.fichaje_eventos.update({
+  where: { id: cambio.eventoId },
+  data: {
+    hora: cambio.hora ? new Date(cambio.hora) : eventoOriginal.hora,
+    editado: true,
+    motivoEdicion: motivo,
+    horaOriginal: eventoOriginal.horaOriginal ?? eventoOriginal.hora // ✅
+  }
+});
+```
+
+**Al revertir**:
+```typescript
+await tx.fichaje_eventos.update({
+  where: { id: cambio.eventoId },
+  data: {
+    hora: new Date(cambio.camposAnteriores.hora),
+    tipo: cambio.camposAnteriores.tipo,
+    editado: cambio.camposAnteriores.editado,
+    motivoEdicion: cambio.camposAnteriores.motivoEdicion,
+    horaOriginal: cambio.camposAnteriores.horaOriginal
+      ? new Date(cambio.camposAnteriores.horaOriginal)
+      : null
+  }
+});
+```
+
+#### D.2 Sistema de Notificaciones Completo
+
+Ver sección 13.5 arriba.
+
+---
+
+**Versión**: 4.0
+**Última actualización**: 10 de diciembre de 2025

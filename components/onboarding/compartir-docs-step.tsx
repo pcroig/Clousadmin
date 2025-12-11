@@ -50,7 +50,7 @@ export function CompartirDocsStep({
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as { documentos?: Documento[] };
         setDocumentos(data.documentos || []);
       }
     } catch (error) {

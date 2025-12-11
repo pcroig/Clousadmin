@@ -159,7 +159,11 @@ export function ImportarEmpleadosExcel({
           empleados: EmpleadoDetectado[];
           equiposDetectados: string[];
           managersDetectados?: string[];
-          resumen: PreviewData['resumen'];
+          resumen: {
+            total: number;
+            validos: number;
+            invalidos: number;
+          };
         };
       }>(analyzeResponse);
 
@@ -464,14 +468,9 @@ export function ImportarEmpleadosExcel({
             </Button>
 
             {shouldShowFinishButton && (
-              <div className="flex gap-2 sm:justify-end">
-                {shouldShowCancelButton && onCancel && (
-                  <Button variant="ghost" onClick={onCancel}>
-                    Cancelar
-                  </Button>
-                )}
-                <Button onClick={handleFinalizar}>Guardar</Button>
-              </div>
+              <Button onClick={handleFinalizar}>
+                Guardar y volver
+              </Button>
             )}
           </div>
         </div>

@@ -5,7 +5,8 @@
 export const ORIGENES_OPTIMISTAS = [
   'añadir_manual',
   'completar_descanso',
-  'corregir_finalizado'
+  'corregir_finalizado',
+  'edicion_empleado'
 ] as const;
 
 export type OrigenOptimista = typeof ORIGENES_OPTIMISTAS[number];

@@ -35,7 +35,7 @@ import { UsuarioRol } from '@/lib/constants/enums';
 import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { invitarEmpleado } from '@/lib/invitaciones';
-import { getPredefinedJornada } from '@/lib/jornadas/get-or-create-default';
+import { resolverJornadaParaNuevoEmpleado } from '@/lib/jornadas/resolver-para-nuevo';
 import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
 
@@ -216,11 +216,21 @@ export async function POST(req: NextRequest) {
 
     console.log(`[ConfirmarImportacion] Puestos creados: ${resultados.puestosCreados}`);
 
-    const jornadaPorDefecto = await getPredefinedJornada(prisma, session.user.empresaId);
+    // 1.5. Detectar si es onboarding inicial (empresa sin jornadas configuradas)
+    // Verificar UNA sola vez antes del loop para optimizar performance
+    const tieneJornadasConfiguradas = await prisma.jornada_asignaciones.count({
+      where: { empresaId: session.user.empresaId }
+    }) > 0;
+
+    console.log(
+      tieneJornadasConfiguradas
+        ? `[ConfirmarImportacion] Empresa operativa - validación de jornada habilitada`
+        : `[ConfirmarImportacion] Onboarding inicial - empleados sin jornada permitidos (se asignarán en paso posterior)`
+    );
 
     // 2. Crear empleados en batches con paralelismo controlado
     const CONCURRENCY = 3; // Procesamos 3 empleados en paralelo (reducido para evitar timeouts por encriptación)
-    
+
     for (const batch of batches) {
       // Dividir batch en chunks de CONCURRENCY para paralelismo controlado
       const chunks: typeof batch[] = [];
@@ -284,6 +294,29 @@ export async function POST(req: NextRequest) {
                   ? new Prisma.Decimal(empleadoData.salarioBaseMensual)
                   : null;
 
+              // Resolver qué jornada asignar al nuevo empleado
+              // Respeta jerarquía: equipo > empresa > manual
+              const equipoIdsEmpleado = empleadoData.equipo && equiposCreados.has(empleadoData.equipo)
+                ? [equiposCreados.get(empleadoData.equipo)!]
+                : [];
+
+              const jornadaId = await resolverJornadaParaNuevoEmpleado(
+                tx,
+                session.user.empresaId,
+                equipoIdsEmpleado
+              );
+
+              // VALIDACIÓN CONDICIONAL: Interpretar correctamente jornadaId === null
+              // En onboarding inicial (sin jornadas): null es CORRECTO (se asignarán en paso 3)
+              // En empresa operativa (con jornadas): null significa asignación automática (CORRECTO)
+              // NO hay caso donde debamos rechazar por jornadaId === null
+              // Si el usuario necesita seleccionar manualmente, el frontend lo maneja
+              if (!tieneJornadasConfiguradas && jornadaId === null) {
+                console.log(`[ImportarExcel] Onboarding inicial - empleado ${empleadoData.email} sin jornada (se asignará después)`);
+              } else if (tieneJornadasConfiguradas && jornadaId === null) {
+                console.log(`[ImportarExcel] Empleado ${empleadoData.email} con asignación automática (resolución dinámica)`);
+              }
+
               const datosEmpleado = {
                 usuarioId: usuario.id,
                 empresaId: session.user.empresaId,
@@ -299,7 +332,7 @@ export async function POST(req: NextRequest) {
                 puestoId: empleadoData.puesto && puestosCreados.has(empleadoData.puesto.trim())
                   ? puestosCreados.get(empleadoData.puesto.trim())
                   : null,
-                jornadaId: jornadaPorDefecto?.id ?? null,
+                jornadaId, // null si hay asignación empresa/equipo, ID si es individual
                 fechaAlta: empleadoData.fechaAlta
                   ? new Date(empleadoData.fechaAlta)
                   : new Date(),

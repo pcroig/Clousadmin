@@ -10,6 +10,9 @@ import { prisma } from '@/lib/prisma';
 
 import { EquiposClient } from './equipos-client';
 
+// Forzar renderizado dinámico para evitar prerendering
+export const dynamic = 'force-dynamic';
+
 
 export default async function EquiposPage(props: {
   searchParams: Promise<{ panel?: string; denunciaId?: string }>;

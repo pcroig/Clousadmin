@@ -64,9 +64,10 @@ export async function register() {
   }
   
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  
-  // Registrar Sentry si está en producción
-  if (process.env.NODE_ENV === 'production') {
-    await import('./sentry.server.config');
-  }
+
+  // TEMPORARY FIX: Deshabilitar Sentry durante build para evitar error de prerendering en Next.js 16
+  // Sentry causa que Next.js intente prerenderizar /_global-error con React Context
+  // if (process.env.NODE_ENV === 'production') {
+  //   await import('./sentry.server.config');
+  // }
 }

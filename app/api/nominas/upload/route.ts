@@ -93,11 +93,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Procesar nóminas (extract ZIPs, match employees)
+    // Generar ID único para este evento de importación
+    const eventoId = `upload-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
     const result = await procesarNominas(
       filesWithBuffers,
       session.user.empresaId,
       mes,
-      anio
+      anio,
+      eventoId
     );
 
     return NextResponse.json({

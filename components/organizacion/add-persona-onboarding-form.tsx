@@ -5,7 +5,8 @@
 // ========================================
 // Formulario para crear empleado y activar onboarding con navegación por pasos
 
-import { FileSignature, FileText, Mail, Upload } from 'lucide-react';
+import { format } from 'date-fns';
+import { AlertCircle, Check, FileSignature, FileText, Mail, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -13,6 +14,7 @@ import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
 import { DialogWithSidebar } from '@/components/shared/dialog-with-sidebar';
 import { DocumentUploader } from '@/components/shared/document-uploader';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { SearchableSelect } from '@/components/shared/searchable-select';
 import { WizardSteps } from '@/components/shared/wizard-steps';
 import {
@@ -48,6 +50,7 @@ interface FormData {
   puestoId: string;
   equipoId: string;
   sedeId: string;
+  jornadaId?: string; // NUEVO: Jornada seleccionada manualmente
   // Datos personales opcionales
   nif?: string;
   nss?: string;
@@ -63,6 +66,11 @@ interface FormData {
   // Datos laborales opcionales
   salarioBaseAnual?: string;
   tipoContrato?: string;
+  fechaFin?: string;
+  categoriaProfesional?: string;
+  grupoCotizacion?: string;
+  nivelEducacion?: string;
+  contratoADistancia?: string;
   // Datos bancarios opcionales
   iban?: string;
   bic?: string;
@@ -98,6 +106,20 @@ interface EmpleadoExistente {
   email: string;
 }
 
+interface Jornada {
+  id: string;
+  nombre: string;
+  horasSemanales: number;
+  tipo: string;
+}
+
+interface JornadaValidacion {
+  tieneAsignacionAutomatica: boolean;
+  jornadaId: string | null;
+  origen: 'empresa' | 'equipo' | null;
+  mensaje: string;
+}
+
 export function AddPersonaOnboardingForm({
   open,
   onOpenChange,
@@ -119,6 +141,14 @@ export function AddPersonaOnboardingForm({
     sedeId: '',
   });
 
+  const parseDateValue = (value?: string) => (value ? new Date(`${value}T00:00:00`) : undefined);
+  const updateDateField = (field: 'fechaAlta' | 'fechaFin' | 'fechaNacimiento', date: Date | undefined) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: date ? format(date, 'yyyy-MM-dd') : '',
+    }));
+  };
+
   // Empleado seleccionado (si es existente)
   const [empleadoSeleccionadoId, setEmpleadoSeleccionadoId] = useState('');
   const [empleadosExistentes, setEmpleadosExistentes] = useState<EmpleadoExistente[]>([]);
@@ -127,6 +157,11 @@ export function AddPersonaOnboardingForm({
   const [puestos, setPuestos] = useState<Puesto[]>([]);
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [sedes, setSedes] = useState<Sede[]>([]);
+
+  // NUEVO: Validación de jornada
+  const [jornadas, setJornadas] = useState<Jornada[]>([]);
+  const [jornadaValidacion, setJornadaValidacion] = useState<JornadaValidacion | null>(null);
+  const [validandoJornada, setValidandoJornada] = useState(false);
 
   // Documentos y firmas (DEPRECADO - solo para empleado existente)
   const [documentosSubidos, setDocumentosSubidos] = useState<DocumentoSubido[]>([]);
@@ -155,11 +190,12 @@ export function AddPersonaOnboardingForm({
 
   const cargarDatosIniciales = async () => {
     try {
-      // Cargar puestos, equipos y sedes
+      // Cargar puestos, equipos, sedes y jornadas
       await Promise.all([
         cargarPuestos(),
         cargarEquipos(),
         cargarSedes(),
+        cargarJornadas(), // NUEVO: Cargar jornadas disponibles
       ]);
 
       // Si es empleado existente, cargar config antigua + empleados sin onboarding
@@ -204,6 +240,17 @@ export function AddPersonaOnboardingForm({
       setSedes(data);
     } catch (error) {
       console.error('[cargarSedes] Error:', error);
+    }
+  };
+
+  const cargarJornadas = async () => {
+    try {
+      const res = await fetch('/api/jornadas');
+      const data = await parseJson<Jornada[]>(res);
+      setJornadas(data || []);
+    } catch (error) {
+      console.error('[cargarJornadas] Error:', error);
+      setJornadas([]);
     }
   };
 
@@ -256,6 +303,46 @@ export function AddPersonaOnboardingForm({
     }
   };
 
+  // NUEVO: Validar jornada automática cuando cambia el equipo
+  useEffect(() => {
+    if (formData.equipoId) {
+      validarJornadaAutomatica();
+    } else {
+      // Si no hay equipo, resetear validación
+      setJornadaValidacion(null);
+      setFormData(prev => ({ ...prev, jornadaId: undefined }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.equipoId]);
+
+  const validarJornadaAutomatica = async () => {
+    if (!formData.equipoId) return;
+
+    setValidandoJornada(true);
+    try {
+      const res = await fetch('/api/jornadas/validar-automatica', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          equipoIds: [formData.equipoId],
+        }),
+      });
+
+      const data = await parseJson<JornadaValidacion>(res);
+      setJornadaValidacion(data);
+
+      // Si hay asignación automática, limpiar jornadaId manual
+      if (data.tieneAsignacionAutomatica) {
+        setFormData(prev => ({ ...prev, jornadaId: undefined }));
+      }
+    } catch (error) {
+      console.error('[validarJornadaAutomatica] Error:', error);
+      toast.error('Error al validar jornada automática');
+    } finally {
+      setValidandoJornada(false);
+    }
+  };
+
   const handleCreatePuesto = async (nombre: string): Promise<string | null> => {
     try {
       const res = await fetch('/api/organizacion/puestos', {
@@ -282,6 +369,16 @@ export function AddPersonaOnboardingForm({
     setLoading(true);
 
     try {
+      // VALIDACIÓN CONDICIONAL: Solo requerir jornada si NO es onboarding inicial
+      // Detectar onboarding inicial: empresa sin jornadas configuradas
+      const esOnboardingInicial = jornadas.length === 0;
+
+      if (!esOnboardingInicial && !jornadaValidacion?.tieneAsignacionAutomatica && !formData.jornadaId) {
+        toast.error('Debes seleccionar una jornada para este empleado');
+        setLoading(false);
+        return;
+      }
+
       // Crear empleado con todos los campos opcionales
       const empleadoData: Record<string, unknown> = {
         nombre: formData.nombre,
@@ -291,6 +388,7 @@ export function AddPersonaOnboardingForm({
         puestoId: formData.puestoId || undefined,
         sedeId: formData.sedeId || undefined,
         activo: tipoEmpleado === 'existente' ? true : false, // Existente ya está activo, nuevo espera onboarding
+        jornadaId: formData.jornadaId || undefined, // NUEVO: Enviar jornadaId si fue seleccionada manualmente
       };
 
       // Añadir campos opcionales si están presentes
@@ -306,6 +404,11 @@ export function AddPersonaOnboardingForm({
       if (formData.direccionProvincia) empleadoData.direccionProvincia = formData.direccionProvincia;
       if (formData.salarioBaseAnual) empleadoData.salarioBaseAnual = formData.salarioBaseAnual;
       if (formData.tipoContrato) empleadoData.tipoContrato = formData.tipoContrato;
+      if (formData.fechaFin) empleadoData.fechaBaja = formData.fechaFin;
+      if (formData.categoriaProfesional) empleadoData.categoriaProfesional = formData.categoriaProfesional;
+      if (formData.grupoCotizacion) empleadoData.grupoCotizacion = parseInt(formData.grupoCotizacion, 10);
+      if (formData.nivelEducacion) empleadoData.nivelEducacion = formData.nivelEducacion;
+      if (formData.contratoADistancia) empleadoData.contratoADistancia = formData.contratoADistancia === 'si';
       if (formData.iban) empleadoData.iban = formData.iban;
       if (formData.bic) empleadoData.bic = formData.bic;
 
@@ -447,7 +550,13 @@ export function AddPersonaOnboardingForm({
   const canGoNext = () => {
     if (currentStep === 'basicos') {
       // Para nuevo y existente manual, validar los mismos campos básicos
-      return formData.nombre && formData.apellidos && formData.email && formData.puestoId && formData.equipoId;
+      const camposBasicosCompletos = formData.nombre && formData.apellidos && formData.email && formData.puestoId && formData.equipoId;
+
+      // VALIDACIÓN CONDICIONAL: Solo requerir jornada si NO es onboarding inicial
+      const esOnboardingInicial = jornadas.length === 0;
+      const tieneJornada = esOnboardingInicial || jornadaValidacion?.tieneAsignacionAutomatica || formData.jornadaId;
+
+      return camposBasicosCompletos && tieneJornada;
     }
     return true;
   };
@@ -475,6 +584,11 @@ export function AddPersonaOnboardingForm({
   const sedesItems = sedes.map((s) => ({
     value: s.id,
     label: s.ciudad ? `${s.nombre} (${s.ciudad})` : s.nombre,
+  }));
+
+  const jornadasItems = jornadas.map((j) => ({
+    value: j.id,
+    label: `${j.horasSemanales}h - ${j.tipo}`,
   }));
 
   const empleadosItems = empleadosExistentes.map((e) => ({
@@ -560,13 +674,47 @@ export function AddPersonaOnboardingForm({
                   </div>
 
                   <div>
-                    <Label>Fecha de Alta</Label>
-                    <Input
-                      type="date"
-                      value={formData.fechaAlta}
-                      onChange={(e) => setFormData({...formData, fechaAlta: e.target.value})}
+                    <Label>Fecha de Alta *</Label>
+                  <ResponsiveDatePicker
+                    date={parseDateValue(formData.fechaAlta)}
+                    onSelect={(date) => updateDateField('fechaAlta', date)}
+                    placeholder="Seleccionar fecha"
+                    label="Seleccionar fecha de alta"
+                    className="w-full"
+                  />
+                  </div>
+
+                  <div>
+                    <Label>Tipo de Contrato *</Label>
+                    <SearchableSelect
+                      items={[
+                        { value: 'indefinido', label: 'Indefinido' },
+                        { value: 'temporal', label: 'Temporal' },
+                        { value: 'administrador', label: 'Administrador' },
+                        { value: 'fijo_discontinuo', label: 'Fijo Discontinuo' },
+                        { value: 'becario', label: 'Becario' },
+                        { value: 'practicas', label: 'Prácticas' },
+                        { value: 'obra_y_servicio', label: 'Obra y Servicio' },
+                      ]}
+                      value={formData.tipoContrato || ''}
+                      onChange={(value) => setFormData({...formData, tipoContrato: value})}
+                      placeholder="Seleccionar tipo"
+                      label="Seleccionar tipo de contrato"
                     />
                   </div>
+
+                  {formData.tipoContrato && !['indefinido', 'fijo_discontinuo', 'administrador'].includes(formData.tipoContrato) && (
+                    <div>
+                      <Label>Fecha de Fin</Label>
+                    <ResponsiveDatePicker
+                      date={parseDateValue(formData.fechaFin)}
+                      onSelect={(date) => updateDateField('fechaFin', date)}
+                      placeholder="Seleccionar fecha"
+                      label="Seleccionar fecha de fin"
+                      className="w-full"
+                    />
+                    </div>
+                  )}
 
                   <div className="col-span-2">
                     <Label>Puesto *</Label>
@@ -602,6 +750,56 @@ export function AddPersonaOnboardingForm({
                   </div>
                 </div>
 
+                {/* VALIDACIÓN DE JORNADA: Solo mostrar si NO es onboarding inicial */}
+                {formData.equipoId && jornadas.length > 0 && (
+                  <div className="mt-4">
+                    {validandoJornada ? (
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <p className="text-sm text-gray-600">Validando jornada automática...</p>
+                      </div>
+                    ) : jornadaValidacion?.tieneAsignacionAutomatica ? (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <Check className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-green-900">
+                              Jornada asignada automáticamente
+                            </p>
+                            <p className="text-sm text-green-700 mt-1">
+                              {jornadaValidacion.mensaje}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-amber-900">
+                              Jornada requerida
+                            </p>
+                            <p className="text-sm text-amber-700 mt-1">
+                              {jornadaValidacion?.mensaje || 'No hay jornada asignada automáticamente. Selecciona una jornada para este empleado.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label>Jornada *</Label>
+                          <SearchableSelect
+                            items={jornadasItems}
+                            value={formData.jornadaId || ''}
+                            onChange={(value) => setFormData({...formData, jornadaId: value})}
+                            placeholder="Seleccionar jornada"
+                            label="Seleccionar jornada"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Campos opcionales adicionales - Colapsados */}
                 <Accordion type="single" collapsible className="w-full">
                   <AccordionItem value="datos-personales">
@@ -611,7 +809,7 @@ export function AddPersonaOnboardingForm({
                     <AccordionContent>
                       <div className="grid grid-cols-2 gap-4 pt-2">
                         <div>
-                          <Label>NIF/DNI/NIE</Label>
+                          <Label>DNI/NIE</Label>
                           <Input
                             value={formData.nif || ''}
                             onChange={(e) => setFormData({...formData, nif: e.target.value})}
@@ -620,7 +818,7 @@ export function AddPersonaOnboardingForm({
                         </div>
 
                         <div>
-                          <Label>NSS</Label>
+                          <Label>Número de Seguridad Social</Label>
                           <Input
                             value={formData.nss || ''}
                             onChange={(e) => setFormData({...formData, nss: e.target.value})}
@@ -630,10 +828,12 @@ export function AddPersonaOnboardingForm({
 
                         <div>
                           <Label>Fecha de Nacimiento</Label>
-                          <Input
-                            type="date"
-                            value={formData.fechaNacimiento || ''}
-                            onChange={(e) => setFormData({...formData, fechaNacimiento: e.target.value})}
+                          <ResponsiveDatePicker
+                            date={parseDateValue(formData.fechaNacimiento)}
+                            onSelect={(date) => updateDateField('fechaNacimiento', date)}
+                            placeholder="Seleccionar fecha"
+                            label="Seleccionar fecha de nacimiento"
+                            className="w-full"
                           />
                         </div>
 
@@ -714,7 +914,7 @@ export function AddPersonaOnboardingForm({
 
                   <AccordionItem value="datos-laborales">
                     <AccordionTrigger className="text-sm font-medium">
-                      Datos Laborales (opcional)
+                      Datos Laborales (opcional - recomendado rellenar)
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="grid grid-cols-2 gap-4 pt-2">
@@ -729,17 +929,77 @@ export function AddPersonaOnboardingForm({
                         </div>
 
                         <div>
-                          <Label>Tipo de Contrato</Label>
+                          <Label>Categoría Profesional</Label>
                           <SearchableSelect
                             items={[
-                              { id: 'indefinido', label: 'Indefinido' },
-                              { id: 'temporal', label: 'Temporal' },
-                              { id: 'practicas', label: 'Prácticas' },
-                              { id: 'formacion', label: 'Formación' },
+                              { value: 'directivo', label: 'Directivo' },
+                              { value: 'gerencia', label: 'Gerencia' },
+                              { value: 'mando_intermedio', label: 'Mando Intermedio' },
+                              { value: 'tecnico_superior', label: 'Técnico Superior' },
+                              { value: 'tecnico_medio', label: 'Técnico Medio' },
+                              { value: 'empleado_cualificado', label: 'Empleado Cualificado' },
+                              { value: 'empleado_no_cualificado', label: 'Empleado No Cualificado' },
                             ]}
-                            value={formData.tipoContrato || ''}
-                            onChange={(value) => setFormData({...formData, tipoContrato: value})}
-                            placeholder="Seleccionar tipo"
+                            value={formData.categoriaProfesional || ''}
+                            onChange={(value) => setFormData({...formData, categoriaProfesional: value})}
+                            placeholder="Seleccionar categoría"
+                            label="Seleccionar categoría profesional"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Grupo de Cotización</Label>
+                          <SearchableSelect
+                            items={[
+                              { value: '1', label: 'Grupo 1: Ingenieros y Licenciados, alta dirección' },
+                              { value: '2', label: 'Grupo 2: Ingenieros Técnicos, Peritos y Ayudantes titulados' },
+                              { value: '3', label: 'Grupo 3: Jefes Administrativos y de Taller' },
+                              { value: '4', label: 'Grupo 4: Ayudantes no titulados' },
+                              { value: '5', label: 'Grupo 5: Oficiales Administrativos' },
+                              { value: '6', label: 'Grupo 6: Subalternos' },
+                              { value: '7', label: 'Grupo 7: Auxiliares Administrativos' },
+                              { value: '8', label: 'Grupo 8: Oficiales de primera y segunda' },
+                              { value: '9', label: 'Grupo 9: Oficiales de tercera y Especialistas' },
+                              { value: '10', label: 'Grupo 10: Peones' },
+                              { value: '11', label: 'Grupo 11: Trabajadores menores de 18 años (cualquier categoría)' },
+                            ]}
+                            value={formData.grupoCotizacion || ''}
+                            onChange={(value) => setFormData({...formData, grupoCotizacion: value})}
+                            placeholder="Seleccionar grupo"
+                            label="Seleccionar grupo de cotización"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Nivel de Educación</Label>
+                          <SearchableSelect
+                            items={[
+                              { value: 'sin_estudios', label: 'Sin estudios' },
+                              { value: 'educacion_primaria', label: 'Educación primaria' },
+                              { value: 'educacion_secundaria_obligatoria', label: 'Educación secundaria obligatoria (ESO)' },
+                              { value: 'bachillerato', label: 'Bachillerato' },
+                              { value: 'formacion_profesional_grado_medio', label: 'Formación profesional grado medio' },
+                              { value: 'formacion_profesional_superior', label: 'Formación profesional superior' },
+                              { value: 'educacion_universitaria_postgrado', label: 'Universitaria / Postgrado' },
+                            ]}
+                            value={formData.nivelEducacion || ''}
+                            onChange={(value) => setFormData({...formData, nivelEducacion: value})}
+                            placeholder="Seleccionar nivel"
+                            label="Seleccionar nivel de educación"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Contrato a Distancia</Label>
+                          <SearchableSelect
+                            items={[
+                              { value: 'no', label: 'No' },
+                              { value: 'si', label: 'Sí' },
+                            ]}
+                            value={formData.contratoADistancia || ''}
+                            onChange={(value) => setFormData({...formData, contratoADistancia: value})}
+                            placeholder="Seleccionar"
+                            label="Seleccionar si es a distancia"
                           />
                         </div>
                       </div>
@@ -867,13 +1127,47 @@ export function AddPersonaOnboardingForm({
                 </div>
 
                 <div>
-                  <Label>Fecha de Alta</Label>
-                  <Input
-                    type="date"
-                    value={formData.fechaAlta}
-                    onChange={(e) => setFormData({...formData, fechaAlta: e.target.value})}
+                  <Label>Fecha de Alta *</Label>
+                  <ResponsiveDatePicker
+                    date={parseDateValue(formData.fechaAlta)}
+                    onSelect={(date) => updateDateField('fechaAlta', date)}
+                    placeholder="Seleccionar fecha"
+                    label="Seleccionar fecha de alta"
+                    className="w-full"
                   />
                 </div>
+
+                <div>
+                  <Label>Tipo de Contrato *</Label>
+                  <SearchableSelect
+                    items={[
+                      { value: 'indefinido', label: 'Indefinido' },
+                      { value: 'temporal', label: 'Temporal' },
+                      { value: 'administrador', label: 'Administrador' },
+                      { value: 'fijo_discontinuo', label: 'Fijo Discontinuo' },
+                      { value: 'becario', label: 'Becario' },
+                      { value: 'practicas', label: 'Prácticas' },
+                      { value: 'obra_y_servicio', label: 'Obra y Servicio' },
+                    ]}
+                    value={formData.tipoContrato || ''}
+                    onChange={(value) => setFormData({...formData, tipoContrato: value})}
+                    placeholder="Seleccionar tipo"
+                    label="Seleccionar tipo de contrato"
+                  />
+                </div>
+
+                {formData.tipoContrato && !['indefinido', 'fijo_discontinuo', 'administrador'].includes(formData.tipoContrato) && (
+                  <div>
+                    <Label>Fecha de Fin</Label>
+                    <ResponsiveDatePicker
+                      date={parseDateValue(formData.fechaFin)}
+                      onSelect={(date) => updateDateField('fechaFin', date)}
+                      placeholder="Seleccionar fecha"
+                      label="Seleccionar fecha de fin"
+                      className="w-full"
+                    />
+                  </div>
+                )}
 
                 <div className="col-span-2">
                   <Label>Puesto *</Label>
@@ -908,6 +1202,153 @@ export function AddPersonaOnboardingForm({
                   />
                 </div>
               </div>
+
+              {/* VALIDACIÓN DE JORNADA: Solo mostrar si NO es onboarding inicial */}
+              {formData.equipoId && jornadas.length > 0 && (
+                <div className="mt-4">
+                  {validandoJornada ? (
+                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                      <p className="text-sm text-gray-600">Validando jornada automática...</p>
+                    </div>
+                  ) : jornadaValidacion?.tieneAsignacionAutomatica ? (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Check className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-green-900">
+                            Jornada asignada automáticamente
+                          </p>
+                          <p className="text-sm text-green-700 mt-1">
+                            {jornadaValidacion.mensaje}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-amber-900">
+                            Jornada requerida
+                          </p>
+                          <p className="text-sm text-gray-700 mt-1">
+                            {jornadaValidacion?.mensaje || 'No hay jornada asignada automáticamente. Selecciona una jornada para este empleado.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label>Jornada *</Label>
+                        <SearchableSelect
+                          items={jornadasItems}
+                          value={formData.jornadaId || ''}
+                          onChange={(value) => setFormData({...formData, jornadaId: value})}
+                          placeholder="Seleccionar jornada"
+                          label="Seleccionar jornada"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Datos Laborales - Solo para HR Admin */}
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="datos-laborales">
+                  <AccordionTrigger className="text-sm font-medium">
+                    Datos Laborales (opcional - recomendado rellenar)
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      <div>
+                        <Label>Salario Base Anual</Label>
+                        <Input
+                          type="number"
+                          value={formData.salarioBaseAnual || ''}
+                          onChange={(e) => setFormData({...formData, salarioBaseAnual: e.target.value})}
+                          placeholder="30000"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Categoría Profesional</Label>
+                        <SearchableSelect
+                          items={[
+                            { value: 'directivo', label: 'Directivo' },
+                            { value: 'gerencia', label: 'Gerencia' },
+                            { value: 'mando_intermedio', label: 'Mando Intermedio' },
+                            { value: 'tecnico_superior', label: 'Técnico Superior' },
+                            { value: 'tecnico_medio', label: 'Técnico Medio' },
+                            { value: 'empleado_cualificado', label: 'Empleado Cualificado' },
+                            { value: 'empleado_no_cualificado', label: 'Empleado No Cualificado' },
+                          ]}
+                          value={formData.categoriaProfesional || ''}
+                          onChange={(value) => setFormData({...formData, categoriaProfesional: value})}
+                          placeholder="Seleccionar categoría"
+                          label="Seleccionar categoría profesional"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Grupo de Cotización</Label>
+                        <SearchableSelect
+                          items={[
+                            { value: '1', label: 'Grupo 1: Ingenieros y Licenciados, alta dirección' },
+                            { value: '2', label: 'Grupo 2: Ingenieros Técnicos, Peritos y Ayudantes titulados' },
+                            { value: '3', label: 'Grupo 3: Jefes Administrativos y de Taller' },
+                            { value: '4', label: 'Grupo 4: Ayudantes no titulados' },
+                            { value: '5', label: 'Grupo 5: Oficiales Administrativos' },
+                            { value: '6', label: 'Grupo 6: Subalternos' },
+                            { value: '7', label: 'Grupo 7: Auxiliares Administrativos' },
+                            { value: '8', label: 'Grupo 8: Oficiales de primera y segunda' },
+                            { value: '9', label: 'Grupo 9: Oficiales de tercera y Especialistas' },
+                            { value: '10', label: 'Grupo 10: Peones' },
+                            { value: '11', label: 'Grupo 11: Trabajadores menores de 18 años (cualquier categoría)' },
+                          ]}
+                          value={formData.grupoCotizacion || ''}
+                          onChange={(value) => setFormData({...formData, grupoCotizacion: value})}
+                          placeholder="Seleccionar grupo"
+                          label="Seleccionar grupo de cotización"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Nivel de Educación</Label>
+                        <SearchableSelect
+                          items={[
+                            { value: 'sin_estudios', label: 'Sin estudios' },
+                            { value: 'educacion_primaria', label: 'Educación primaria' },
+                            { value: 'educacion_secundaria_obligatoria', label: 'Educación secundaria obligatoria (ESO)' },
+                            { value: 'bachillerato', label: 'Bachillerato' },
+                            { value: 'formacion_profesional_grado_medio', label: 'Formación profesional grado medio' },
+                            { value: 'formacion_profesional_superior', label: 'Formación profesional superior' },
+                            { value: 'educacion_universitaria_postgrado', label: 'Universitaria / Postgrado' },
+                          ]}
+                          value={formData.nivelEducacion || ''}
+                          onChange={(value) => setFormData({...formData, nivelEducacion: value})}
+                          placeholder="Seleccionar nivel"
+                          label="Seleccionar nivel de educación"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Contrato a Distancia</Label>
+                        <SearchableSelect
+                          items={[
+                            { value: 'no', label: 'No' },
+                            { value: 'si', label: 'Sí' },
+                          ]}
+                          value={formData.contratoADistancia || ''}
+                          onChange={(value) => setFormData({...formData, contratoADistancia: value})}
+                          placeholder="Seleccionar"
+                          label="Seleccionar si es a distancia"
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
 
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <Button

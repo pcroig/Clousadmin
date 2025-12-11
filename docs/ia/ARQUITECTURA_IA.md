@@ -201,7 +201,7 @@ const result = await analyzeDocument(
   schema,
   {
     nombre: 'Nombre completo',
-    nif: 'NIF/DNI/NIE',
+    nif: 'DNI/NIE',
     fechaNacimiento: 'Fecha de nacimiento',
   },
   {

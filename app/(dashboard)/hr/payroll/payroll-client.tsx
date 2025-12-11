@@ -43,6 +43,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import {
   Stepper,
   StepperIndicator,
@@ -115,7 +116,7 @@ interface EventoNomina {
   mes: number;
   anio: number;
   estado: string;
-  fechaGeneracion: string | null;
+  fechaCreacion: string | null; // Fecha de creación del evento
   fechaExportacion: string | null;
   fechaImportacion: string | null;
   fechaPublicacion: string | null;
@@ -173,8 +174,8 @@ const getStepIndexFromState = (evento: EventoNomina): number => {
     return 3;
   }
 
-  if (!evento.fechaGeneracion) {
-    return 1;
+  if (evento.estado === 'pendiente') {
+    return 1; // Paso 1: Nóminas base creadas, pendiente de generar pre-nóminas
   }
 
   const tienePendientes = (evento.nominasConComplementosPendientes ?? 0) > 0;
@@ -227,6 +228,42 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
 
 
   const handleGenerarEvento = async () => {
+    // Cerrar el diálogo de crear evento
+    setShowCreateEventDialog(false);
+
+    // PASO 1: Si compensarHoras está activado, abrir diálogo (OBLIGATORIO - blocking)
+    if (abrirCompensarTrasCreacion) {
+      // Preparar contexto temporal (el evento aún no existe)
+      setEventoCompensarContext({
+        eventoId: '', // Se llenará después de crear el evento
+        mes: mesActual,
+        anio: anioActual,
+      });
+      setShowCompensarHorasDialog(true);
+      // El flujo continuará cuando el usuario cierre CompensarHorasDialog
+      // (ver onClose del CompensarHorasDialog más abajo)
+      return;
+    }
+
+    // PASO 2: Si validarComplementos está activado, crear evento y luego abrir diálogo (OPCIONAL - puede saltarse)
+    if (abrirValidarTrasCreacion) {
+      // Crear el evento primero (necesario para tener eventoId)
+      const eventoId = await crearEvento();
+
+      // Luego abrir el diálogo de validar complementos (el usuario puede completar o saltar)
+      if (eventoId) {
+        setEventoIdParaValidar(eventoId);
+        setShowValidarComplementosDialog(true);
+      }
+      return;
+    }
+
+    // PASO 3: Crear el evento (si no hay validar complementos activado)
+    await crearEvento();
+  };
+
+  // Función separada para crear el evento
+  const crearEvento = async (): Promise<string | undefined> => {
     try {
       setIsGenerating(true);
 
@@ -236,6 +273,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         body: JSON.stringify({
           mes: mesActual,
           anio: anioActual,
+          compensarHoras: abrirCompensarTrasCreacion,
         }),
       });
 
@@ -248,36 +286,26 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
       const evento = data.evento as Record<string, unknown> | undefined;
       const eventoId = evento && typeof evento.id === 'string' ? evento.id : undefined;
 
-      if (eventoId) {
-        if (abrirCompensarTrasCreacion) {
-          setEventoCompensarContext({
-            eventoId: eventoId,
-            mes: mesActual,
-            anio: anioActual,
-          });
-          setShowCompensarHorasDialog(true);
-        }
+      const resultado = data.resultado as Record<string, unknown> | undefined;
+      const nominasCreadas = resultado && typeof resultado.nominasCreadas === 'number'
+        ? resultado.nominasCreadas
+        : 0;
 
-        if (abrirValidarTrasCreacion) {
-          setEventoIdParaValidar(eventoId);
-          setShowValidarComplementosDialog(true);
-        }
-      }
-
-      const nominasGeneradas = typeof data.nominasGeneradas === 'number' ? data.nominasGeneradas : 0;
-      toast.success('Evento generado correctamente', {
-        description: `${nominasGeneradas} pre-nómina(s) creadas`,
+      toast.success(`Evento creado con ${nominasCreadas} nóminas base`, {
+        description: 'Revisa complementos y alertas antes de generar pre-nóminas',
       });
 
-      setShowCreateEventDialog(false);
       if (eventoId) {
         setSelectedEventoId(eventoId);
         setSelectedNominaId(null);
       }
       fetchEventos();
+
+      return eventoId;
     } catch (error) {
       console.error('Error generando evento:', error);
       toast.error(error instanceof Error ? error.message : 'Error al generar evento');
+      return undefined;
     } finally {
       setIsGenerating(false);
     }
@@ -600,14 +628,11 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                 evento.tieneComplementos ?? evento.empleadosConComplementos > 0;
 
               const eventoAbierto = evento.estado !== EVENTO_ESTADOS.CERRADO;
-              const debeGenerarPrenominas =
-                !evento.fechaGeneracion || totalNominasEvento === 0;
+              // ✅ Mostrar "Generar Pre-nóminas" solo si el evento está en estado "pendiente"
+              const debeGenerarPrenominas = evento.estado === 'pendiente';
 
               const mostrarRevisarComplementos = eventoAbierto && tieneComplementos;
               const puedeRevisarComplementos = mostrarRevisarComplementos;
-
-              const mostrarCompensarHoras = eventoAbierto;
-              const puedeCompensarHoras = eventoAbierto;
 
               const mostrarExportarPrenominas = eventoAbierto;
               const puedeExportarPrenominas = eventoAbierto;
@@ -812,34 +837,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                         </Button>
                         )}
 
-                        {mostrarCompensarHoras && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEventoCompensarContext({
-                                eventoId: evento.id,
-                                mes: evento.mes,
-                                anio: evento.anio,
-                              });
-                              setShowCompensarHorasDialog(true);
-                            }}
-                            disabled={!puedeCompensarHoras || isProcessing}
-                            className="flex-1 min-w-[190px] justify-between"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-4 h-4" />
-                              <span>Compensar horas</span>
-                            </div>
-                            {horasExtraInfo.horasPendientes > 0 && (
-                              <span className="text-xs text-orange-600 font-medium">
-                                {horasExtraInfo.horasPendientes.toFixed(1)}h pendientes
-                              </span>
-                            )}
-                        </Button>
-                        )}
-
                         {mostrarExportarPrenominas && (
                         <Button
                           size="sm"
@@ -891,51 +888,44 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-              Las pre-nóminas se generan automáticamente para todos los empleados activos.
-              Puedes completar complementos, compensar horas o importar PDFs cuando quieras.
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="compensar-horas-modal"
+            {/* Toggle 1: Compensar Horas Extra */}
+            <div className="flex items-center justify-between space-x-4 py-2">
+              <div className="flex-1">
+                <label
+                  htmlFor="compensar-horas-toggle"
+                  className="text-base font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Compensar horas extra
+                </label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Se configurará ANTES de crear el evento (paso obligatorio)
+                </p>
+              </div>
+              <Switch
+                id="compensar-horas-toggle"
                 checked={abrirCompensarTrasCreacion}
-                onCheckedChange={(checked) =>
-                  setAbrirCompensarTrasCreacion(Boolean(checked))
-                }
+                onCheckedChange={setAbrirCompensarTrasCreacion}
               />
-              <div className="flex-1">
-                <label
-                  htmlFor="compensar-horas-modal"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  Abrir compensación de horas extra al crear el evento
-                </label>
-                <p className="text-xs text-gray-500 mt-1">
-                  Abre automáticamente el diálogo para revisar la bolsa de horas del mes.
-                </p>
-              </div>
             </div>
 
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="validar-complementos-modal"
-                checked={abrirValidarTrasCreacion}
-                onCheckedChange={(checked) =>
-                  setAbrirValidarTrasCreacion(Boolean(checked))
-                }
-              />
+            {/* Toggle 2: Validar Complementos */}
+            <div className="flex items-center justify-between space-x-4 py-2">
               <div className="flex-1">
                 <label
-                  htmlFor="validar-complementos-modal"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  htmlFor="validar-complementos-toggle"
+                  className="text-base font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  Abrir validación de complementos tras crear el evento
+                  Validar complementos
                 </label>
-                <p className="text-xs text-gray-500 mt-1">
-                  Accede directamente al flujo de revisión de complementos.
+                <p className="text-sm text-muted-foreground mt-1">
+                  Se puede completar o saltar (se hará de forma asíncrona)
                 </p>
               </div>
+              <Switch
+                id="validar-complementos-toggle"
+                checked={abrirValidarTrasCreacion}
+                onCheckedChange={setAbrirValidarTrasCreacion}
+              />
             </div>
           </div>
 
@@ -994,10 +984,28 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           mes={eventoCompensarContext.mes}
           anio={eventoCompensarContext.anio}
           isOpen={showCompensarHorasDialog}
-          onClose={() => {
+          onClose={async () => {
             setShowCompensarHorasDialog(false);
             setEventoCompensarContext(null);
-            fetchEventos();
+
+            // Si el eventoId está vacío, significa que venimos del flujo de crear evento
+            // Continuar con el siguiente paso: validar complementos (si está activado) o crear evento
+            if (!eventoCompensarContext.eventoId) {
+              if (abrirValidarTrasCreacion) {
+                // Crear el evento primero y luego abrir ValidarComplementosDialog
+                const nuevoEventoId = await crearEvento();
+                if (nuevoEventoId) {
+                  setEventoIdParaValidar(nuevoEventoId);
+                  setShowValidarComplementosDialog(true);
+                }
+              } else {
+                // Crear el evento después de compensar horas (sin validar complementos)
+                await crearEvento();
+              }
+            } else {
+              // Si el eventoId existe, venimos de un botón normal, solo refrescar
+              fetchEventos();
+            }
           }}
         />
       )}
@@ -1420,14 +1428,10 @@ function EventoDetailsPanel({
                 <dt className="text-gray-600">Total Nóminas</dt>
                 <dd className="font-medium text-gray-900">{evento.nominas?.length || 0}</dd>
               </div>
-              {evento.fechaGeneracion && (
-                <div>
-                  <dt className="text-gray-600">Generado</dt>
-                  <dd className="font-medium text-gray-900">
-                    {new Date(evento.fechaGeneracion).toLocaleDateString('es-ES')}
-                  </dd>
-                        </div>
-                      )}
+              <div>
+                <dt className="text-gray-600">Estado</dt>
+                <dd className="font-medium text-gray-900 capitalize">{evento.estado}</dd>
+              </div>
               {evento.fechaImportacion && (
                 <div>
                   <dt className="text-gray-600">Importado</dt>

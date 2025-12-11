@@ -226,17 +226,18 @@ export async function POST(req: NextRequest) {
     await prisma.$transaction(async (tx) => {
       switch (validatedData.nivel) {
         case 'empresa':
-          // Asignar a todos los empleados de la empresa
-          const resultEmpresa = await tx.empleados.updateMany({
+          // Para asignación a empresa: NO asignar jornadaId individualmente
+          // Solo guardar metadata en jornada_asignaciones (se hace después)
+          // Los empleados resolverán su jornada mediante obtenerJornadaEmpleado()
+
+          // Contar empleados afectados para el mensaje de respuesta
+          const countEmpresa = await tx.empleados.count({
             where: {
               empresaId: session.user.empresaId,
               activo: true,
             },
-            data: {
-              jornadaId: validatedData.jornadaId,
-            },
           });
-          empleadosActualizados = resultEmpresa.count;
+          empleadosActualizados = countEmpresa;
           break;
 
         case 'equipo':
@@ -244,7 +245,10 @@ export async function POST(req: NextRequest) {
             throw new Error('Debes especificar al menos un equipo');
           }
 
-          // Obtener empleados de los equipos especificados
+          // Para asignación a equipo: NO asignar jornadaId individualmente
+          // Solo guardar metadata en jornada_asignaciones (se hace después)
+
+          // Obtener empleados de los equipos especificados para contar
           const miembrosEquipos = await tx.empleado_equipos.findMany({
             where: {
               equipoId: { in: validatedData.equipoIds },
@@ -255,20 +259,7 @@ export async function POST(req: NextRequest) {
           });
 
           const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
-
-          if (empleadoIdsEquipos.length > 0) {
-            const resultEquipos = await tx.empleados.updateMany({
-              where: {
-                id: { in: empleadoIdsEquipos },
-                empresaId: session.user.empresaId,
-                activo: true,
-              },
-              data: {
-                jornadaId: validatedData.jornadaId,
-              },
-            });
-            empleadosActualizados = resultEquipos.count;
-          }
+          empleadosActualizados = empleadoIdsEquipos.length;
           break;
 
         case 'individual':
@@ -276,9 +267,31 @@ export async function POST(req: NextRequest) {
             throw new Error('Debes especificar al menos un empleado');
           }
 
-          const resultIndividual = await tx.empleados.updateMany({
+          // Verificar que todos los empleados existan y estén activos
+          const empleadosValidos = await tx.empleados.findMany({
             where: {
               id: { in: validatedData.empleadoIds },
+              empresaId: session.user.empresaId,
+              activo: true,
+            },
+            select: { id: true },
+          });
+
+          const empleadoIdsValidos = empleadosValidos.map(e => e.id);
+
+          if (empleadoIdsValidos.length === 0) {
+            throw new Error('Ninguno de los empleados seleccionados está activo');
+          }
+
+          if (empleadoIdsValidos.length < validatedData.empleadoIds.length) {
+            const inactivos = validatedData.empleadoIds.length - empleadoIdsValidos.length;
+            console.warn(`[Asignar Jornada] ${inactivos} empleado(s) inactivo(s) fueron filtrado(s)`);
+          }
+
+          // Para asignación individual: SÍ asignar jornadaId directamente
+          const resultIndividual = await tx.empleados.updateMany({
+            where: {
+              id: { in: empleadoIdsValidos },
               empresaId: session.user.empresaId,
               activo: true,
             },
@@ -287,6 +300,10 @@ export async function POST(req: NextRequest) {
             },
           });
           empleadosActualizados = resultIndividual.count;
+
+          // Actualizar validatedData.empleadoIds para que solo contenga IDs válidos
+          // Esto asegura que se guarden solo empleados activos en la metadata
+          validatedData.empleadoIds = empleadoIdsValidos;
           break;
       }
 
@@ -300,10 +317,12 @@ export async function POST(req: NextRequest) {
           empresaId: session.user.empresaId,
           nivelAsignacion: validatedData.nivel,
           equipoIds: (validatedData.nivel === 'equipo' ? validatedData.equipoIds : null) as any,
+          empleadoIds: (validatedData.nivel === 'individual' ? validatedData.empleadoIds : null) as any,
         },
         update: {
           nivelAsignacion: validatedData.nivel,
           equipoIds: (validatedData.nivel === 'equipo' ? validatedData.equipoIds : null) as any,
+          empleadoIds: (validatedData.nivel === 'individual' ? validatedData.empleadoIds : null) as any,
           updatedAt: new Date(),
         },
       });
