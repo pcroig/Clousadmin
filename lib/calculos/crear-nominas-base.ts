@@ -12,11 +12,15 @@ import { generarAlertasParaNomina } from '@/lib/calculos/alertas-nomina';
 import { prisma } from '@/lib/prisma';
 import { normalizarFechaSinHora } from '@/lib/utils/fechas';
 
+// Tipo para el cliente de Prisma (puede ser el global o uno de transacción)
+type PrismaClient = typeof prisma | Prisma.TransactionClient;
+
 interface CrearNominasBaseOptions {
   eventoId: string;
   empresaId: string;
   mes: number;
   anio: number;
+  prismaClient?: PrismaClient; // ✅ Cliente opcional para transacciones
 }
 
 export interface CrearNominasBaseResult {
@@ -47,7 +51,10 @@ export interface CrearNominasBaseResult {
 export async function crearNominasBase(
   options: CrearNominasBaseOptions
 ): Promise<CrearNominasBaseResult> {
-  const { eventoId, empresaId, mes, anio } = options;
+  const { eventoId, empresaId, mes, anio, prismaClient } = options;
+
+  // ✅ Usar el cliente proporcionado o el global
+  const db = prismaClient || prisma;
 
   // Calcular rango del mes (normalizado a UTC para consistencia con BD)
   const inicioMes = normalizarFechaSinHora(new Date(anio, mes - 1, 1));
@@ -56,7 +63,7 @@ export async function crearNominasBase(
   finMes.setHours(23, 59, 59, 999);
 
   // 1. Obtener empleados activos con datos necesarios
-  const empleados = await prisma.empleados.findMany({
+  const empleados = await db.empleados.findMany({
     where: {
       empresaId,
       activo: true,
@@ -90,7 +97,7 @@ export async function crearNominasBase(
 
   if (empleados.length === 0) {
     // Sin empleados activos, actualizar evento y retornar
-    await prisma.eventos_nomina.update({
+    await db.eventos_nomina.update({
       where: { id: eventoId },
       data: {
         totalEmpleados: 0,
@@ -146,7 +153,7 @@ export async function crearNominasBase(
     }
 
     // Crear nómina base
-    const nomina = await prisma.nominas.create({
+    const nomina = await db.nominas.create({
       data: {
         empleadoId: empleado.id,
         contratoId: contratoActivo?.id || null,

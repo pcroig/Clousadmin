@@ -264,7 +264,7 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
           fetch('/api/organizacion/puestos'),
           fetch('/api/organizacion/equipos'),
           fetch('/api/empleados?activos=true&limit=200'),
-          fetch('/api/organizacion/sedes'),
+          fetch('/api/sedes'),
           fetch('/api/tipos-complemento'),
         ]);
 

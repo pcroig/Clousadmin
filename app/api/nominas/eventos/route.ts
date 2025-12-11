@@ -229,6 +229,7 @@ export async function POST(req: NextRequest) {
         empresaId: session.user.empresaId,
         mes: data.mes,
         anio: data.anio,
+        prismaClient: tx, // ✅ Pasar el cliente de transacción
       });
 
       // 3. Actualizar evento con estadísticas
