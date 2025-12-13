@@ -52,130 +52,84 @@ export async function POST(request: NextRequest) {
     // Obtener todas las empresas
     const empresas = await prisma.empresas.findMany();
 
-    let fichajesCreados = 0;
-    let fichajesPendientes = 0;
-    let fichajesFinalizados = 0;
-    const errores: string[] = [];
+    // OPTIMIZACIÓN: Procesar empresas EN PARALELO para reducir tiempo de ejecución
+    // Antes: 3 empresas × 20s = 60s (secuencial)
+    // Ahora: max(20s, 20s, 20s) = 20-25s (paralelo)
+    console.log(`[CRON Cerrar Jornadas] Procesando ${empresas.length} empresas en paralelo...`);
 
-    for (const empresa of empresas) {
-      try {
-        console.log(`[CRON Cerrar Jornadas] Procesando empresa: ${empresa.nombre}`);
+    const resultadosPorEmpresa = await Promise.all(
+      empresas.map(async (empresa) => {
+        let fichajesCreados = 0;
+        let fichajesPendientes = 0;
+        let fichajesFinalizados = 0;
+        const errores: string[] = [];
 
-        // PASO 1: Procesar fichajes del día ANTERIOR (siempre cerrar)
-        const empleadosAyer = await obtenerEmpleadosDisponibles(empresa.id, ayer);
-        console.log(`[CRON Cerrar Jornadas] ${empleadosAyer.length} empleados disponibles ayer en ${empresa.nombre}`);
+        try {
+          console.log(`[CRON Cerrar Jornadas] Procesando empresa: ${empresa.nombre}`);
 
-        for (const empleado of empleadosAyer) {
-          try {
-            // Buscar fichaje del día anterior
-            let fichaje = await prisma.fichajes.findUnique({
-              where: {
-                empleadoId_fecha: {
-                  empleadoId: empleado.id,
-                  fecha: ayer,
-                },
-              },
-              include: {
-                eventos: true,
-              },
-            });
+          // PASO 1: Procesar fichajes del día ANTERIOR (siempre cerrar)
+          const empleadosAyer = await obtenerEmpleadosDisponibles(empresa.id, ayer);
+          console.log(`[CRON Cerrar Jornadas] ${empleadosAyer.length} empleados disponibles ayer en ${empresa.nombre}`);
 
-            // Si no existe fichaje, verificar si hay ausencia de día completo
-            if (!fichaje) {
-              // Verificar ausencia de día completo
-              // (ausencia sin periodo específico = día completo)
-              const ausenciaDiaCompleto = await prisma.ausencias.findFirst({
+          for (const empleado of empleadosAyer) {
+            try {
+              // Buscar fichaje del día anterior
+              let fichaje = await prisma.fichajes.findUnique({
                 where: {
-                  empleadoId: empleado.id,
-                  fechaInicio: { lte: ayer },
-                  fechaFin: { gte: ayer },
-                  estado: { in: ['confirmada', 'completada'] }, // Ausencias aprobadas
-                  periodo: null, // null = día completo
-                }
-              });
-
-              if (ausenciaDiaCompleto) {
-                console.log(`[CRON Cerrar Jornadas] Empleado ${empleado.nombre} ${empleado.apellidos} tiene ausencia día completo, NO crear fichaje`);
-                continue; // NO crear fichaje para ausencias de día completo
-              }
-
-              // CRÍTICO: No crear fichajes para empleados sin jornada asignada
-              if (!empleado.jornada?.id) {
-                console.warn(
-                  `[CRON Cerrar Jornadas] Empleado ${empleado.nombre} ${empleado.apellidos} no tiene jornada asignada. Omitiendo.`
-                );
-                continue;
-              }
-
-              // Si no hay ausencia día completo, crear fichaje pendiente
-              fichaje = await prisma.fichajes.create({
-                data: {
-                  empresaId: empresa.id,
-                  empleadoId: empleado.id,
-                  jornadaId: empleado.jornada.id,
-                  tipoFichaje: 'ordinario', // CRON solo crea fichajes ordinarios
-                  fecha: ayer,
-                  estado: EstadoFichaje.pendiente,
+                  empleadoId_fecha: {
+                    empleadoId: empleado.id,
+                    fecha: ayer,
+                  },
                 },
                 include: {
                   eventos: true,
                 },
               });
 
-              console.log(`[CRON Cerrar Jornadas] Fichaje creado para ${empleado.nombre} ${empleado.apellidos}`);
-              fichajesCreados++;
-              fichajesPendientes++;
-
-              // Crear notificación de fichaje pendiente
-              await crearNotificacionFichajeRequiereRevision(prisma, {
-                fichajeId: fichaje.id,
-                empresaId: empresa.id,
-                empleadoId: empleado.id,
-                empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
-                fecha: fichaje.fecha,
-                razon: 'No se registraron fichajes en el día',
-              });
-
-              continue;
-            }
-
-            // BLOQUEO: Ignorar fichajes rechazados (congelados)
-            if (fichaje.estado === 'rechazado') {
-              console.log(
-                `[CRON Cerrar Jornadas] Fichaje ${fichaje.id} está rechazado (congelado), omitiendo`
-              );
-              continue;
-            }
-
-            // Si el fichaje está en curso, validarlo
-            if (fichaje.estado === EstadoFichaje.en_curso) {
-              // Validar si está completo
-              const validacion = await validarFichajeCompleto(fichaje.id);
-
-              // Actualizar cálculos
-              await actualizarCalculosFichaje(fichaje.id);
-
-              if (validacion.completo) {
-                // Fichaje completo: finalizar
-                await prisma.fichajes.update({
-                  where: { id: fichaje.id },
-                  data: {
-                    estado: EstadoFichaje.finalizado,
-                  },
+              // Si no existe fichaje, verificar si hay ausencia de día completo
+              if (!fichaje) {
+                // Verificar ausencia de día completo
+                // (ausencia sin periodo específico = día completo)
+                const ausenciaDiaCompleto = await prisma.ausencias.findFirst({
+                  where: {
+                    empleadoId: empleado.id,
+                    fechaInicio: { lte: ayer },
+                    fechaFin: { gte: ayer },
+                    estado: { in: ['confirmada', 'completada'] }, // Ausencias aprobadas
+                    periodo: null, // null = día completo
+                  }
                 });
 
-                console.log(`[CRON Cerrar Jornadas] Fichaje finalizado: ${empleado.nombre} ${empleado.apellidos}`);
-                fichajesFinalizados++;
-              } else {
-                // Fichaje incompleto: pendiente de cuadrar
-                await prisma.fichajes.update({
-                  where: { id: fichaje.id },
+                if (ausenciaDiaCompleto) {
+                  console.log(`[CRON Cerrar Jornadas] Empleado ${empleado.nombre} ${empleado.apellidos} tiene ausencia día completo, NO crear fichaje`);
+                  continue; // NO crear fichajes para ausencias de día completo
+                }
+
+                // CRÍTICO: No crear fichajes para empleados sin jornada asignada
+                if (!empleado.jornada?.id) {
+                  console.warn(
+                    `[CRON Cerrar Jornadas] Empleado ${empleado.nombre} ${empleado.apellidos} no tiene jornada asignada. Omitiendo.`
+                  );
+                  continue;
+                }
+
+                // Si no hay ausencia día completo, crear fichaje pendiente
+                fichaje = await prisma.fichajes.create({
                   data: {
+                    empresaId: empresa.id,
+                    empleadoId: empleado.id,
+                    jornadaId: empleado.jornada.id,
+                    tipoFichaje: 'ordinario', // CRON solo crea fichajes ordinarios
+                    fecha: ayer,
                     estado: EstadoFichaje.pendiente,
                   },
+                  include: {
+                    eventos: true,
+                  },
                 });
 
-                console.log(`[CRON Cerrar Jornadas] Fichaje pendiente: ${empleado.nombre} ${empleado.apellidos} - ${validacion.razon}`);
+                console.log(`[CRON Cerrar Jornadas] Fichaje creado para ${empleado.nombre} ${empleado.apellidos}`);
+                fichajesCreados++;
                 fichajesPendientes++;
 
                 // Crear notificación de fichaje pendiente
@@ -185,26 +139,89 @@ export async function POST(request: NextRequest) {
                   empleadoId: empleado.id,
                   empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
                   fecha: fichaje.fecha,
-                  razon: validacion.razon ?? 'Faltan eventos por registrar',
+                  razon: 'No se registraron fichajes en el día',
                 });
+
+                continue;
               }
+
+              // BLOQUEO: Ignorar fichajes rechazados (congelados)
+              if (fichaje.estado === 'rechazado') {
+                console.log(
+                  `[CRON Cerrar Jornadas] Fichaje ${fichaje.id} está rechazado (congelado), omitiendo`
+                );
+                continue;
+              }
+
+              // Si el fichaje está en curso, validarlo
+              if (fichaje.estado === EstadoFichaje.en_curso) {
+                // Validar si está completo
+                const validacion = await validarFichajeCompleto(fichaje.id);
+
+                // Actualizar cálculos
+                await actualizarCalculosFichaje(fichaje.id);
+
+                if (validacion.completo) {
+                  // Fichaje completo: finalizar
+                  await prisma.fichajes.update({
+                    where: { id: fichaje.id },
+                    data: {
+                      estado: EstadoFichaje.finalizado,
+                    },
+                  });
+
+                  console.log(`[CRON Cerrar Jornadas] Fichaje finalizado: ${empleado.nombre} ${empleado.apellidos}`);
+                  fichajesFinalizados++;
+                } else {
+                  // Fichaje incompleto: pendiente de cuadrar
+                  await prisma.fichajes.update({
+                    where: { id: fichaje.id },
+                    data: {
+                      estado: EstadoFichaje.pendiente,
+                    },
+                  });
+
+                  console.log(`[CRON Cerrar Jornadas] Fichaje pendiente: ${empleado.nombre} ${empleado.apellidos} - ${validacion.razon}`);
+                  fichajesPendientes++;
+
+                  // Crear notificación de fichaje pendiente
+                  await crearNotificacionFichajeRequiereRevision(prisma, {
+                    fichajeId: fichaje.id,
+                    empresaId: empresa.id,
+                    empleadoId: empleado.id,
+                    empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
+                    fecha: fichaje.fecha,
+                    razon: validacion.razon ?? 'Faltan eventos por registrar',
+                  });
+                }
+              }
+            } catch (error) {
+              const mensaje = `Error procesando empleado de ayer ${empleado.nombre} ${empleado.apellidos}: ${
+                error instanceof Error ? error.message : 'Error desconocido'
+              }`;
+              errores.push(mensaje);
+              console.error(`[CRON Cerrar Jornadas] ${mensaje}`);
             }
-          } catch (error) {
-            const mensaje = `Error procesando empleado de ayer ${empleado.nombre} ${empleado.apellidos}: ${
-              error instanceof Error ? error.message : 'Error desconocido'
-            }`;
-            errores.push(mensaje);
-            console.error(`[CRON Cerrar Jornadas] ${mensaje}`);
           }
+
+          console.log(`[CRON Cerrar Jornadas] Empresa ${empresa.nombre} procesada exitosamente`);
+        } catch (error) {
+          const mensaje = `Error procesando empresa ${empresa.nombre}: ${
+            error instanceof Error ? error.message : 'Error desconocido'
+          }`;
+          errores.push(mensaje);
+          console.error(`[CRON Cerrar Jornadas] ${mensaje}`);
         }
-      } catch (error) {
-        const mensaje = `Error procesando empresa ${empresa.nombre}: ${
-          error instanceof Error ? error.message : 'Error desconocido'
-        }`;
-        errores.push(mensaje);
-        console.error(`[CRON Cerrar Jornadas] ${mensaje}`);
-      }
-    }
+
+        return { fichajesCreados, fichajesPendientes, fichajesFinalizados, errores };
+      })
+    );
+
+    // Agregar resultados de todas las empresas procesadas en paralelo
+    const fichajesCreados = resultadosPorEmpresa.reduce((sum, r) => sum + r.fichajesCreados, 0);
+    const fichajesPendientes = resultadosPorEmpresa.reduce((sum, r) => sum + r.fichajesPendientes, 0);
+    const fichajesFinalizados = resultadosPorEmpresa.reduce((sum, r) => sum + r.fichajesFinalizados, 0);
+    const errores = resultadosPorEmpresa.flatMap((r) => r.errores);
 
     // ========================================
     // PASO 2: Encolar jobs para calcular eventos propuestos
