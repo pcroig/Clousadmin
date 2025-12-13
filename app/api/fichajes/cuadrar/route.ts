@@ -669,8 +669,12 @@ export async function POST(request: NextRequest) {
           // Si no faltan eventos, solo cerrar
           // (puede ser porque: 1) eventos propuestos completaron todo, 2) pausa_fin calculada, o 3) eventos ya existían)
           if (eventosFaltantes.length === 0) {
-            await tx.fichajes.update({
-              where: { id: fichajeId },
+            // OPTIMISTIC LOCK: Verificar que el fichaje sigue en estado pendiente
+            const resultado = await tx.fichajes.updateMany({
+              where: {
+                id: fichajeId,
+                estado: 'pendiente', // Solo actualizar si sigue pendiente
+              },
               data: {
                 estado: 'finalizado',
                 cuadradoMasivamente: true,
@@ -678,6 +682,12 @@ export async function POST(request: NextRequest) {
                 cuadradoEn: new Date(),
               },
             });
+
+            if (resultado.count === 0) {
+              errores.push(`Fichaje ${fichajeId}: Ya fue procesado por otro usuario`);
+              continue;
+            }
+
             cuadrados++;
             continue;
           }
@@ -883,8 +893,13 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          await tx.fichajes.update({
-            where: { id: fichajeId },
+          // OPTIMISTIC LOCK: Verificar que el fichaje sigue en estado pendiente
+          // Previene race condition si dos HR admins intentan cuadrar simultáneamente
+          const resultado = await tx.fichajes.updateMany({
+            where: {
+              id: fichajeId,
+              estado: 'pendiente', // Solo actualizar si sigue pendiente
+            },
             data: {
               estado: 'finalizado',
               horasTrabajadas,
@@ -895,6 +910,12 @@ export async function POST(request: NextRequest) {
               fechaAprobacion: new Date(),
             },
           });
+
+          // Si count === 0, el fichaje ya fue procesado por otro usuario
+          if (resultado.count === 0) {
+            errores.push(`Fichaje ${fichajeId}: Ya fue procesado por otro usuario`);
+            continue;
+          }
 
           cuadrados++;
 
