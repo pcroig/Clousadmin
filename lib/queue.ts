@@ -78,28 +78,30 @@ export async function enqueueJob(
 
   console.log(`[Queue] Encolando job ${jobType} para ${(payload as CalcularEventosPropuestosPayload).fichajeIds.length} fichajes`);
 
-  // CRÍTICO: NO esperar respuesta del worker (fire-and-forget)
-  // El worker puede tardar mucho tiempo procesando fichajes
-  // y no queremos bloquear el CRON esperando la respuesta
-  fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${workerSecret}`,
-    },
-    body: JSON.stringify(payload),
-  })
-    .then(response => {
-      if (!response.ok) {
-        console.error(`[Queue] Worker respondió con error ${response.status} pero job ya fue encolado`);
-      } else {
-        console.log(`[Queue] Worker confirmó recepción de job ${jobType}`);
-      }
+  // CRÍTICO: Ejecutar worker en verdadero background usando setImmediate/setTimeout
+  // Next.js espera todas las promesas del request, incluso sin await
+  // Usamos setImmediate para ejecutar DESPUÉS de que la respuesta se envíe
+  setImmediate(() => {
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${workerSecret}`,
+      },
+      body: JSON.stringify(payload),
     })
-    .catch((error: unknown) => {
-      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      console.error(`[Queue] Error encolando job ${jobType} (job puede haberse ejecutado):`, errorMsg);
-    });
+      .then(response => {
+        if (!response.ok) {
+          console.error(`[Queue] Worker respondió con error ${response.status} pero job ya fue encolado`);
+        } else {
+          console.log(`[Queue] Worker confirmó recepción de job ${jobType}`);
+        }
+      })
+      .catch((error: unknown) => {
+        const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+        console.error(`[Queue] Error encolando job ${jobType} (job puede haberse ejecutado):`, errorMsg);
+      });
+  });
 
   // Retornar inmediatamente sin esperar
   console.log(`[Queue] Job ${jobType} encolado exitosamente (procesándose en background)`);
