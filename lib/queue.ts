@@ -76,30 +76,32 @@ export async function enqueueJob(
   const url = `${baseUrl}/api/workers/${jobType}`;
   const workerSecret = process.env.WORKER_SECRET || 'dev-secret';
 
-  console.log(`[Queue] URL: ${url}`);
-  console.log(`[Queue] Worker secret present: ${workerSecret ? 'YES' : 'NO'} (length: ${workerSecret.length})`);
+  console.log(`[Queue] Encolando job ${jobType} para ${(payload as CalcularEventosPropuestosPayload).fichajeIds.length} fichajes`);
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${workerSecret}`,
-      },
-      body: JSON.stringify(payload),
+  // CRÍTICO: NO esperar respuesta del worker (fire-and-forget)
+  // El worker puede tardar mucho tiempo procesando fichajes
+  // y no queremos bloquear el CRON esperando la respuesta
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${workerSecret}`,
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(response => {
+      if (!response.ok) {
+        console.error(`[Queue] Worker respondió con error ${response.status} pero job ya fue encolado`);
+      } else {
+        console.log(`[Queue] Worker confirmó recepción de job ${jobType}`);
+      }
+    })
+    .catch(error => {
+      console.error(`[Queue] Error encolando job ${jobType} (job puede haberse ejecutado):`, error.message);
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Worker HTTP falló: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    console.log(`[Queue] Job ${jobType} ejecutado exitosamente:`, result);
-  } catch (error) {
-    console.error(`[Queue] Error ejecutando job ${jobType}:`, error);
-    throw error;
-  }
+  // Retornar inmediatamente sin esperar
+  console.log(`[Queue] Job ${jobType} encolado exitosamente (procesándose en background)`);
 }
 
 /**
