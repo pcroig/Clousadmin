@@ -70,10 +70,9 @@ export async function enqueueJob(
   // MODO 2: HTTP directo (desarrollo/fallback)
   console.log(`[Queue] Ejecutando job ${jobType} vía HTTP directo`);
 
-  // Prioriza Hetzner/producción: URL pública explícita.
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
-    || process.env.NEXT_PUBLIC_URL
-    || 'http://localhost:3000';
+  // En servidor: SIEMPRE usar localhost para evitar pasar por NGINX
+  // En desarrollo: usar localhost también
+  const baseUrl = 'http://localhost:3000';
 
   try {
     const response = await fetch(`${baseUrl}/api/workers/${jobType}`, {
