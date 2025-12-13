@@ -1,3 +1,5 @@
+import { logger } from '../logger';
+
 interface CronSummary {
   success: boolean;
   durationMs?: number;
@@ -9,7 +11,7 @@ const ALERT_WEBHOOK = process.env.CRON_ALERT_WEBHOOK;
 
 export function initCronLogger(cronName: string) {
   const startedAt = Date.now();
-  console.info(`[CRON ${cronName}] Inicio ${new Date(startedAt).toISOString()}`);
+  logger.cron(cronName, 'started', { startedAt: new Date(startedAt).toISOString() });
 
   return {
     async finish(result: CronSummary) {
@@ -19,11 +21,15 @@ export function initCronLogger(cronName: string) {
         durationMs,
       };
 
-      const logFn = result.success ? console.info : console.error;
-      logFn(
-        `[CRON ${cronName}] Finalizado en ${durationMs}ms`,
-        payload.metadata || ''
-      );
+      if (result.success) {
+        logger.cron(cronName, 'completed', payload.metadata);
+      } else {
+        logger.cron(cronName, 'failed', {
+          ...payload.metadata,
+          errors: result.errors,
+          durationMs,
+        });
+      }
 
       if (!result.success && ALERT_WEBHOOK) {
         try {
@@ -37,7 +43,7 @@ export function initCronLogger(cronName: string) {
             }),
           });
         } catch (error) {
-          console.error(`[CRON ${cronName}] Error notificando webhook`, error);
+          logger.error(`CRON ${cronName} webhook notification failed`, error instanceof Error ? error : new Error(String(error)));
         }
       }
     },
