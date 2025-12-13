@@ -73,13 +73,18 @@ export async function enqueueJob(
   // En servidor: SIEMPRE usar localhost para evitar pasar por NGINX
   // En desarrollo: usar localhost también
   const baseUrl = 'http://localhost:3000';
+  const url = `${baseUrl}/api/workers/${jobType}`;
+  const workerSecret = process.env.WORKER_SECRET || 'dev-secret';
+
+  console.log(`[Queue] URL: ${url}`);
+  console.log(`[Queue] Worker secret present: ${workerSecret ? 'YES' : 'NO'} (length: ${workerSecret.length})`);
 
   try {
-    const response = await fetch(`${baseUrl}/api/workers/${jobType}`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.WORKER_SECRET || 'dev-secret'}`,
+        'Authorization': `Bearer ${workerSecret}`,
       },
       body: JSON.stringify(payload),
     });
