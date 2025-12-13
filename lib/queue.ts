@@ -96,8 +96,9 @@ export async function enqueueJob(
         console.log(`[Queue] Worker confirmó recepción de job ${jobType}`);
       }
     })
-    .catch(error => {
-      console.error(`[Queue] Error encolando job ${jobType} (job puede haberse ejecutado):`, error.message);
+    .catch((error: unknown) => {
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      console.error(`[Queue] Error encolando job ${jobType} (job puede haberse ejecutado):`, errorMsg);
     });
 
   // Retornar inmediatamente sin esperar
