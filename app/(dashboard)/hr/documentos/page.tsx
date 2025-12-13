@@ -66,3 +66,6 @@ export default async function DocumentosPage() {
 
   return <DocumentosClient carpetas={carpetasData} plantillasEnabled={PLANTILLAS_ENABLED} />;
 }
+
+
+

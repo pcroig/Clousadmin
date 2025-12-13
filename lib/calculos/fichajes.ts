@@ -1138,12 +1138,20 @@ export async function crearFichajesAutomaticos(
       });
 
       if (!fichajeExistente) {
+        // CRÍTICO: No crear fichajes sin jornada asignada
+        if (!empleado.jornada?.id) {
+          const mensaje = `Empleado ${empleado.nombre} ${empleado.apellidos} no tiene jornada asignada`;
+          errores.push(mensaje);
+          console.warn('[crearFichajesAutomaticos]', mensaje);
+          continue;
+        }
+
         // Crear fichaje vacío en estado "en_curso"
         await prisma.fichajes.create({
           data: {
             empresaId,
             empleadoId: empleado.id,
-            jornadaId: empleado.jornada?.id ?? null,
+            jornadaId: empleado.jornada.id,  // Siempre tiene valor (validado arriba)
             fecha: fechaSinHora,
             estado: PrismaEstadoFichaje.en_curso,
           },
@@ -1217,11 +1225,19 @@ export async function procesarFichajesDia(
       });
 
       if (!fichaje) {
+        // CRÍTICO: No crear fichajes sin jornada asignada
+        if (!empleado.jornada?.id) {
+          const mensaje = `Empleado ${empleado.nombre} ${empleado.apellidos} no tiene jornada asignada`;
+          resultado.errores.push(mensaje);
+          console.warn('[procesarFichajesDia]', mensaje);
+          continue;
+        }
+
         fichaje = await prisma.fichajes.create({
           data: {
             empresaId,
             empleadoId: empleado.id,
-            jornadaId: empleado.jornada?.id ?? null,
+            jornadaId: empleado.jornada.id,  // Siempre tiene valor (validado arriba)
             fecha: fechaSinHora,
             estado: PrismaEstadoFichaje.pendiente,
           },

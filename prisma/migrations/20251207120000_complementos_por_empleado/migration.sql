@@ -32,3 +32,6 @@ ALTER TABLE "tipos_complemento" DROP COLUMN IF EXISTS "importeFijo";
 
 
 
+
+
+

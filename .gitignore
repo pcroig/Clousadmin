@@ -56,3 +56,72 @@ next-env.d.ts
 # Claude CLI local config
 .claudeignore
 public/pdf.worker.min.mjs
+
+# Build logs
+build-*.log
+
+# Backups
+*.backup
+*.bak
+*.bak2
+*.bak3
+.env.backup.*
+
+# Scripts temporales
+scripts/test-*.ts
+scripts/diagnostico-*.ts
+scripts/setup-test-*.ts
+scripts/setup-datos-*.ts
+scripts/qa-*.ts
+scripts/audit-*.ts
+scripts/verificar-integridad-*.ts
+scripts/limpiar-*.ts
+scripts/migrar-jornadas-*.ts
+scripts/check-jornada-*.ts
+scripts/find-empleados-temp.ts
+scripts/calcular-eventos-test.ts
+scripts/seed-fichajes-qa.ts
+scripts/validacion-*.ts
+scripts/verificar-jornadas-*.ts
+scripts/crear-datos-*.ts
+scripts/crear-historico-*.ts
+
+# Documentos de análisis temporal en raíz
+/ANALISIS_*.md
+/INVESTIGACION_*.md
+/PLAN_*.md
+/REVISION_*.md
+/SOLUCION_*.md
+/FIX_*.md
+/VERIFICACION_*.md
+/CAUSA_*.md
+/COMANDOS_*.md
+/DOCS_*.md
+/FASE*.md
+/GUIA_*.md
+/RESUMEN_*.md
+/ARCHIVOS-*.md
+/CARPETAS-*.md
+/CODE_*.md
+/COMPONENT-*.md
+/CONFIRMACION_*.md
+/DEPLOYMENT-*.md
+/FICHAJES-*.md
+/IMPLEMENTACION-*.md
+/MEJORAS_*.md
+/MIGRACION-*.md
+/MOBILE-*.md
+/REFACTORING_*.md
+/COMPLEMENTOS-*.md
+
+# Excepciones: documentos importantes
+!/PLAN-LIMPIEZA-CODIGO-SENIOR.md
+!/RESUMEN-EJECUTIVO-ESTADO-PLATAFORMA.md
+!/SOLUCION-504-TIMEOUT-DIC-13-2025.md
+
+# Archivos temporales de limpieza
+limpieza-temporal.sh
+eliminar-scripts-temp.sh
+
+# Backup completo del proyecto
+backup-pre-limpieza-*.tar.gz

@@ -78,3 +78,9 @@ export async function GET(
     return NextResponse.json({ error: 'Error al obtener justificante' }, { status: 500 });
   }
 }
+
+
+
+
+
+

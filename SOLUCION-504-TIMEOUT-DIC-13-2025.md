@@ -25,6 +25,12 @@ El problema tenía múltiples capas:
 - Probablemente un miner de criptomonedas
 - **ELIMINADO Y LIMPIADO**
 
+### 4. NGINX IPv4/IPv6 Mismatch
+- Next.js escuchaba solo en IPv6 (:::3000)
+- NGINX intentaba conectar a IPv4 (127.0.0.1:3000)
+- Resultado: "Connection timed out" en todos los requests
+- **Producción completamente caída con 502 Bad Gateway**
+
 ## ✅ Soluciones Implementadas
 
 ### 1. Procesamiento Paralelo de Empresas
@@ -44,6 +50,11 @@ Archivos creados:
 ### 4. Crontab del Sistema Limpio
 Archivo: /etc/crontab
 
+### 5. Fix NGINX IPv6 Configuration
+Archivo: /etc/nginx/sites-available/clousadmin
+Cambio: `proxy_pass http://127.0.0.1:3000;` → `proxy_pass http://[::1]:3000;`
+Beneficio: Producción 100% funcional, sin 502 Bad Gateway
+
 ## 📊 Resultados Finales
 
 ### Antes
@@ -51,14 +62,18 @@ Archivo: /etc/crontab
 - ❌ Fallaba con 502 Bad Gateway
 - ❌ Workers no se ejecutaban
 - ❌ Malware en el sistema
+- ❌ **Producción completamente caída (502 Bad Gateway)**
+- ❌ NGINX no podía conectar a Next.js (IPv4/IPv6 mismatch)
 
-### Ahora  
+### Ahora
 - ✅ CRON completa en 0.3-0.5 segundos
 - ✅ Sin errores 502/504
 - ✅ Workers se ejecutan en background correctamente
 - ✅ 10 jobs encolados por CRON
 - ✅ Sistema limpio sin malware
 - ✅ Procesamiento paralelo de empresas
+- ✅ **Producción 100% operativa**
+- ✅ NGINX conecta correctamente vía IPv6
 
 ## 🔐 Seguridad - IMPORTANTE
 

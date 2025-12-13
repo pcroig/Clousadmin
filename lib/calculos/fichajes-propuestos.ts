@@ -35,9 +35,8 @@ interface JornadaConfig {
  */
 type FichajeCompleto = fichajes & {
   eventos: fichaje_eventos[];
-  empleado: empleados & {
-    jornada: jornadas | null;
-  };
+  empleado: empleados;
+  jornada: jornadas | null;
 };
 
 /**
@@ -56,11 +55,8 @@ export async function calcularEventosPropuestos(
     where: { id: fichajeId },
     include: {
       eventos: { orderBy: { hora: 'asc' } },
-      empleado: {
-        include: {
-          jornada: true,
-        },
-      },
+      empleado: true,
+      jornada: true, // Cargar jornada desde el fichaje, NO desde el empleado
     },
   });
 
@@ -68,8 +64,13 @@ export async function calcularEventosPropuestos(
     throw new Error(`Fichaje ${fichajeId} no encontrado`);
   }
 
-  if (!fichaje.empleado.jornada) {
-    throw new Error(`Empleado ${fichaje.empleadoId} no tiene jornada asignada`);
+  // CRÍTICO: Validar que el fichaje tenga jornada asignada
+  // El fichaje DEBE tener jornadaId (asignado por el CRON o al crear el fichaje)
+  if (!fichaje.jornada) {
+    throw new Error(
+      `Fichaje ${fichajeId} no tiene jornada asignada (jornadaId: ${fichaje.jornadaId}). ` +
+      `El fichaje debe crearse con una jornada válida antes de calcular eventos propuestos.`
+    );
   }
 
   return calcularEventosPropuestosInterno(fichaje as FichajeCompleto);
@@ -81,7 +82,8 @@ export async function calcularEventosPropuestos(
 async function calcularEventosPropuestosInterno(
   fichaje: FichajeCompleto
 ): Promise<EventoPropuesto[]> {
-  const config = fichaje.empleado.jornada?.config as JornadaConfig | null;
+  // Acceder a jornada desde fichaje.jornada, NO desde fichaje.empleado.jornada
+  const config = fichaje.jornada?.config as JornadaConfig | null;
   if (!config) {
     throw new Error('Configuraci\u00f3n de jornada no encontrada');
   }

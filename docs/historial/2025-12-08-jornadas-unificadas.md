@@ -47,3 +47,6 @@ Los siguientes documentos quedan reemplazados por este resumen unificado:
 - `FIX_VALIDACION_SOLAPAMIENTOS_JORNADAS_DIC_8_2025.md`
 - `MEJORAS_ERRORES_JORNADAS_DIC_8_2025.md`
 - `SOLUCION_JORNADAS_COMPLETA.md`
+
+
+
