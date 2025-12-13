@@ -13,7 +13,6 @@ export function ImportarEmpleados() {
       showHeader={false}
       showCancelButton={false}
       showFinishButton={false}
-      autoConfirmAfterAnalysis
     />
   );
 }

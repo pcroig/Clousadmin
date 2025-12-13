@@ -40,10 +40,6 @@
   "exclude": [
     "node_modules",
     "scripts/**/*",
-    "lib/plantillas/**/*",
-    "lib/firma-digital/**/*",
-    "app/api/nominas/**/*",
-    "components/onboarding/**/*",
     "docs/**/*",
     "prisma/seed.ts",
     "prisma/seed-plantillas.ts",

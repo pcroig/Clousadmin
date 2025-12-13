@@ -51,7 +51,7 @@ export function PlanSelection({
           throw new Error(data.error || 'Error al cargar planes');
         }
 
-        setProducts(data.products);
+        setProducts((data.products || []) as ProductWithPrices[]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error desconocido');
       } finally {
@@ -78,7 +78,9 @@ export function PlanSelection({
 
       // Redirigir a Stripe Checkout
       // Después del pago, Stripe redirige a la URL de éxito configurada
-      window.location.href = data.url;
+      if (data.url) {
+        window.location.href = data.url;
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error desconocido');
     }
