@@ -71,36 +71,52 @@ export async function POST(request: NextRequest) {
           const empleadosAyer = await obtenerEmpleadosDisponibles(empresa.id, ayer);
           console.log(`[CRON Cerrar Jornadas] ${empleadosAyer.length} empleados disponibles ayer en ${empresa.nombre}`);
 
+          // OPTIMIZACIÓN: Batch queries para evitar N+1
+          // Cargar todos los fichajes del día de una vez
+          const empleadoIds = empleadosAyer.map(e => e.id);
+          const fichajesDelDia = await prisma.fichajes.findMany({
+            where: {
+              empleadoId: { in: empleadoIds },
+              fecha: ayer,
+            },
+            include: {
+              eventos: true,
+            },
+          });
+          const fichajesMap = new Map(fichajesDelDia.map(f => [f.empleadoId, f]));
+
+          // Cargar todas las ausencias del día de una vez
+          const ausenciasDelDia = await prisma.ausencias.findMany({
+            where: {
+              empleadoId: { in: empleadoIds },
+              fechaInicio: { lte: ayer },
+              fechaFin: { gte: ayer },
+              estado: { in: ['confirmada', 'completada'] },
+            },
+            select: {
+              empleadoId: true,
+              periodo: true,
+            },
+          });
+
+          // Mapas para búsqueda O(1)
+          const ausenciasDiaCompletoSet = new Set(
+            ausenciasDelDia
+              .filter(a => a.periodo === null)
+              .map(a => a.empleadoId)
+          );
+
           for (const empleado of empleadosAyer) {
             try {
-              // Buscar fichaje del día anterior
-              let fichaje = await prisma.fichajes.findUnique({
-                where: {
-                  empleadoId_fecha: {
-                    empleadoId: empleado.id,
-                    fecha: ayer,
-                  },
-                },
-                include: {
-                  eventos: true,
-                },
-              });
+              // Buscar fichaje en memoria (ya cargado)
+              let fichaje = fichajesMap.get(empleado.id);
 
               // Si no existe fichaje, verificar si hay ausencia de día completo
               if (!fichaje) {
-                // Verificar ausencia de día completo
-                // (ausencia sin periodo específico = día completo)
-                const ausenciaDiaCompleto = await prisma.ausencias.findFirst({
-                  where: {
-                    empleadoId: empleado.id,
-                    fechaInicio: { lte: ayer },
-                    fechaFin: { gte: ayer },
-                    estado: { in: ['confirmada', 'completada'] }, // Ausencias aprobadas
-                    periodo: null, // null = día completo
-                  }
-                });
+                // Verificar ausencia de día completo en memoria
+                const tieneAusenciaDiaCompleto = ausenciasDiaCompletoSet.has(empleado.id);
 
-                if (ausenciaDiaCompleto) {
+                if (tieneAusenciaDiaCompleto) {
                   console.log(`[CRON Cerrar Jornadas] Empleado ${empleado.nombre} ${empleado.apellidos} tiene ausencia día completo, NO crear fichaje`);
                   continue; // NO crear fichajes para ausencias de día completo
                 }
@@ -254,21 +270,31 @@ export async function POST(request: NextRequest) {
       if (fichajesPendientesParaCalcular.length > 0) {
         // Filtrar fichajes que NO tienen ausencia de medio día
         // (ausencias medio día se cuadran manualmente)
+
+        // OPTIMIZACIÓN: Cargar ausencias de medio día en batch
+        const empleadoIdsFichajes = Array.from(new Set(fichajesPendientesParaCalcular.map(f => f.empleadoId)));
+        const ausenciasMedioDia = await prisma.ausencias.findMany({
+          where: {
+            empleadoId: { in: empleadoIdsFichajes },
+            fechaInicio: { lte: ayer },
+            fechaFin: { gte: ayer },
+            estado: { in: ['confirmada', 'completada'] },
+            periodo: { in: ['manana', 'tarde'] },
+          },
+          select: {
+            empleadoId: true,
+          },
+        });
+
+        // Set para búsqueda O(1)
+        const empleadosConAusenciaMedioDia = new Set(ausenciasMedioDia.map(a => a.empleadoId));
+
         const fichajesParaCalcular: string[] = [];
-
         for (const fichaje of fichajesPendientesParaCalcular) {
-          // Verificar ausencia de medio día
-          const ausenciaMedioDia = await prisma.ausencias.findFirst({
-            where: {
-              empleadoId: fichaje.empleadoId,
-              fechaInicio: { lte: ayer },
-              fechaFin: { gte: ayer },
-              estado: { in: ['confirmada', 'completada'] }, // Ausencias aprobadas
-              periodo: { in: ['manana', 'tarde'] },
-            },
-          });
+          // Verificar ausencia de medio día en memoria
+          const tieneAusenciaMedioDia = empleadosConAusenciaMedioDia.has(fichaje.empleadoId);
 
-          if (!ausenciaMedioDia) {
+          if (!tieneAusenciaMedioDia) {
             // No tiene ausencia medio día → Calcular eventos propuestos
             fichajesParaCalcular.push(fichaje.id);
           } else {

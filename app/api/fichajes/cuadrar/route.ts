@@ -424,6 +424,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 2d. OPTIMIZACIÓN: Cargar todos los eventos propuestos en batch (evita N+1)
+    // En vez de cargar eventos propuestos dentro del loop (1 query por fichaje),
+    // cargamos todos de una vez y usamos un Map para lookups O(1)
+    const fichajeIdsParaEventos = fichajes.map(f => f.id);
+    const eventosPropuestosBatch = await prisma.fichaje_eventos_propuestos.findMany({
+      where: {
+        fichajeId: { in: fichajeIdsParaEventos },
+      },
+      orderBy: { hora: 'asc' },
+    });
+
+    // Mapa para búsqueda O(1): fichajeId -> EventoPropuesto[]
+    const mapaEventosPropuestos = new Map<string, typeof eventosPropuestosBatch>();
+    for (const evento of eventosPropuestosBatch) {
+      if (!mapaEventosPropuestos.has(evento.fichajeId)) {
+        mapaEventosPropuestos.set(evento.fichajeId, []);
+      }
+      mapaEventosPropuestos.get(evento.fichajeId)!.push(evento);
+    }
+
     // 3. Procesar cada fichaje en memoria
     // Usamos una transacción o promesas paralelas controladas si el volumen es muy alto.
     // Para simplificar y evitar deadlocks masivos, procesamos secuencialmente pero con datos ya en memoria.
@@ -556,10 +576,9 @@ export async function POST(request: NextRequest) {
           // ========================================
           // Si el fichaje tiene eventos propuestos calculados, usarlos primero
           // antes de intentar cálculo histórico o defaults
-          const eventosPropuestos = await tx.fichaje_eventos_propuestos.findMany({
-            where: { fichajeId },
-            orderBy: { hora: 'asc' },
-          });
+
+          // OPTIMIZACIÓN: Usar eventos propuestos pre-cargados del Map (evita N+1)
+          const eventosPropuestos = mapaEventosPropuestos.get(fichajeId) ?? [];
 
           if (eventosPropuestos.length > 0 && eventosFaltantes.length > 0) {
             console.log(`[API Cuadrar] Usando ${eventosPropuestos.length} eventos propuestos para fichaje ${fichajeId}`);

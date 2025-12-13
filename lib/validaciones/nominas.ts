@@ -9,7 +9,7 @@ import { EstadoAusencia } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 
-import { obtenerHorasEsperadas } from '../calculos/fichajes';
+import { obtenerHorasEsperadasBatch } from '../calculos/fichajes';
 
 /**
  * Tipos de alertas
@@ -265,14 +265,15 @@ async function detectarAlertasAdvertencia(
   // Calcular horas esperadas (aproximadamente 8h x días laborables)
   let horasEsperadas = 0;
   if (empleado.jornadaId) {
-    // Calcular sumando las horas esperadas de cada día
-    for (const fichaje of fichajes) {
-      const horasEsperadasDia = await obtenerHorasEsperadas(
-        empleadoId,
-        fichaje.fecha
-      );
-      horasEsperadas += horasEsperadasDia;
-    }
+    // OPTIMIZACIÓN: Usar versión batch para evitar N+1 (1 query en vez de N queries)
+    const entradas = fichajes.map(fichaje => ({
+      empleadoId,
+      fecha: fichaje.fecha,
+    }));
+    const horasEsperadasBatch = await obtenerHorasEsperadasBatch(entradas);
+
+    // Sumar las horas esperadas de cada día
+    horasEsperadas = Object.values(horasEsperadasBatch).reduce((sum, horas) => sum + horas, 0);
   } else {
     // Fallback: 8 horas por día trabajado
     horasEsperadas = fichajes.length * 8;
